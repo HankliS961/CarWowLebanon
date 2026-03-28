@@ -1,0 +1,747 @@
+// CarSouk - Lebanese Reverse Car Marketplace
+// Prisma Schema - PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  BUYER
+  SELLER
+  DEALER
+  ADMIN
+}
+
+enum Region {
+  BEIRUT
+  MOUNT_LEBANON
+  NORTH
+  SOUTH
+  BEKAA
+  NABATIEH
+}
+
+enum Language {
+  AR
+  EN
+}
+
+enum CarCondition {
+  NEW
+  USED
+  CERTIFIED_PREOWNED
+}
+
+enum CarSource {
+  LOCAL
+  IMPORTED_USA
+  IMPORTED_GULF
+  IMPORTED_EUROPE
+  SALVAGE_REBUILT
+}
+
+enum BodyType {
+  SEDAN
+  SUV
+  HATCHBACK
+  PICKUP
+  COUPE
+  CONVERTIBLE
+  VAN
+  WAGON
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  HYBRID
+  ELECTRIC
+  PLUG_IN_HYBRID
+}
+
+enum Transmission {
+  AUTOMATIC
+  MANUAL
+  CVT
+}
+
+enum Drivetrain {
+  FWD
+  RWD
+  AWD
+  FOUR_WD
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  SOLD
+  EXPIRED
+}
+
+enum InquiryStatus {
+  NEW
+  VIEWED
+  RESPONDED
+  CONVERTED
+  CLOSED
+}
+
+enum ContactMethod {
+  WHATSAPP
+  CALL
+  EMAIL
+  IN_APP
+}
+
+enum ConfigurationStatus {
+  OPEN
+  MATCHED
+  CLOSED
+  EXPIRED
+}
+
+enum OfferStatus {
+  PENDING
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum FinancePreference {
+  CASH
+  FINANCE
+  NOT_SURE
+}
+
+enum SellListingStatus {
+  PENDING_REVIEW
+  LIVE
+  SOLD
+  EXPIRED
+  CANCELLED
+}
+
+enum BidStatus {
+  PENDING
+  WINNING
+  OUTBID
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionTier {
+  FREE
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum DealerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum BlogCategory {
+  BUYING_GUIDE
+  SELLING_TIPS
+  CAR_NEWS
+  IMPORT_CUSTOMS
+  FINANCE_INSURANCE
+  MAINTENANCE
+  MARKET_ANALYSIS
+}
+
+enum NotificationType {
+  NEW_OFFER
+  NEW_INQUIRY
+  PRICE_DROP
+  NEW_BID
+  REVIEW_RECEIVED
+  LISTING_MATCH
+}
+
+enum SearchAlertFrequency {
+  INSTANT
+  DAILY
+  WEEKLY
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ============================================================================
+// NEXTAUTH.JS REQUIRED TABLES
+// ============================================================================
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================================
+// USER & DEALER
+// ============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String?   @unique
+  passwordHash String?
+  name         String?
+  role         UserRole  @default(BUYER)
+  avatarUrl    String?
+  locationRegion Region?
+  locationCity String?
+  languagePref Language  @default(AR)
+  isVerified   Boolean   @default(false)
+  googleId     String?   @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // Business relations
+  dealer          Dealer?
+  inquiries       Inquiry[]
+  configurations  CarConfiguration[]
+  sellListings    SellListing[]
+  savedCars       SavedCar[]
+  searchAlerts    SearchAlert[]
+  notifications   Notification[]
+  dealerReviews   DealerReview[]
+  blogPosts       BlogPost[]         @relation("BlogAuthor")
+  carReviews      CarReview[]        @relation("CarReviewAuthor")
+  adminLogs       AdminLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([googleId])
+  @@map("users")
+}
+
+model Dealer {
+  id                    String           @id @default(uuid())
+  userId                String           @unique
+  companyName           String
+  companyNameAr         String
+  slug                  String           @unique
+  tradeLicenseUrl       String?
+  logoUrl               String?
+  coverImageUrl         String?
+  descriptionEn         String?          @db.Text
+  descriptionAr         String?          @db.Text
+  address               String?
+  region                Region
+  city                  String
+  lat                   Decimal?         @db.Decimal(10, 7)
+  lng                   Decimal?         @db.Decimal(10, 7)
+  phone                 String
+  whatsappNumber        String?
+  email                 String
+  websiteUrl            String?
+  instagramUrl          String?
+  workingHours          Json?
+  brandsCarried         Json?
+  isVerified            Boolean          @default(false)
+  isFeatured            Boolean          @default(false)
+  subscriptionTier      SubscriptionTier @default(FREE)
+  subscriptionExpiresAt DateTime?
+  ratingAvg             Decimal          @default(0) @db.Decimal(3, 2)
+  reviewCount           Int              @default(0)
+  status                DealerStatus     @default(PENDING)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cars          Car[]
+  inquiries     Inquiry[]
+  offers        DealerOffer[]
+  sellBids      SellBid[]
+  reviews       DealerReview[]
+
+  @@index([slug])
+  @@index([region])
+  @@index([status])
+  @@index([isVerified])
+  @@index([isFeatured])
+  @@index([subscriptionTier])
+  @@map("dealers")
+}
+
+// ============================================================================
+// CAR LISTINGS
+// ============================================================================
+
+model Car {
+  id               String        @id @default(uuid())
+  dealerId         String
+  status           ListingStatus @default(DRAFT)
+  condition        CarCondition
+  source           CarSource
+  make             String
+  model            String
+  year             Int
+  trim             String?
+  bodyType         BodyType
+  mileageKm        Int
+  fuelType         FuelType
+  transmission     Transmission
+  drivetrain       Drivetrain?
+  engineSize       String?
+  horsepower       Int?
+  colorExterior    String?
+  colorInterior    String?
+  features         Json          @default("[]")
+  descriptionEn    String?       @db.Text
+  descriptionAr    String?       @db.Text
+  priceUsd         Decimal       @db.Decimal(12, 2)
+  priceLbp         Decimal?      @db.Decimal(18, 2)
+  originalPriceUsd Decimal?      @db.Decimal(12, 2)
+  isNegotiable     Boolean       @default(false)
+  images           Json          @default("[]")
+  thumbnailUrl     String?
+  viewsCount       Int           @default(0)
+  inquiriesCount   Int           @default(0)
+  isFeatured       Boolean       @default(false)
+  locationRegion   Region
+  locationCity     String
+  customsPaid      Boolean?
+  accidentHistory  Boolean?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  expiresAt        DateTime?
+
+  dealer    Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  inquiries Inquiry[]
+  savedBy   SavedCar[]
+
+  @@index([make, model])
+  @@index([priceUsd])
+  @@index([status, condition])
+  @@index([locationRegion])
+  @@index([createdAt(sort: Desc)])
+  @@index([dealerId])
+  @@index([year])
+  @@index([bodyType])
+  @@index([fuelType])
+  @@index([isFeatured])
+  @@index([source])
+  @@map("cars")
+}
+
+// ============================================================================
+// INQUIRIES
+// ============================================================================
+
+model Inquiry {
+  id               String        @id @default(uuid())
+  carId            String
+  buyerId          String
+  dealerId         String
+  message          String?       @db.Text
+  preferredContact ContactMethod
+  status           InquiryStatus @default(NEW)
+  createdAt        DateTime      @default(now())
+  viewedAt         DateTime?
+  respondedAt      DateTime?
+
+  car     Car            @relation(fields: [carId], references: [id], onDelete: Cascade)
+  buyer   User           @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  dealer  Dealer         @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  reviews DealerReview[]
+
+  @@index([dealerId, status])
+  @@index([buyerId])
+  @@index([carId])
+  @@index([createdAt(sort: Desc)])
+  @@map("inquiries")
+}
+
+// ============================================================================
+// REVERSE MARKETPLACE — CONFIGURATIONS & OFFERS
+// ============================================================================
+
+model CarConfiguration {
+  id                String              @id @default(uuid())
+  buyerId           String
+  make              String?
+  model             String?
+  year              Int?
+  trim              String?
+  bodyType          BodyType?
+  preferredColor    String?
+  budgetMinUsd      Decimal             @db.Decimal(12, 2)
+  budgetMaxUsd      Decimal             @db.Decimal(12, 2)
+  financePreference FinancePreference
+  featuresWanted    Json                @default("[]")
+  notes             String?             @db.Text
+  locationRegion    Region?
+  status            ConfigurationStatus @default(OPEN)
+  createdAt         DateTime            @default(now())
+  expiresAt         DateTime?
+
+  buyer  User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  offers DealerOffer[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([make, model])
+  @@index([createdAt(sort: Desc)])
+  @@map("car_configurations")
+}
+
+model DealerOffer {
+  id               String      @id @default(uuid())
+  configurationId  String
+  dealerId         String
+  priceOfferedUsd  Decimal     @db.Decimal(12, 2)
+  deliveryTimeDays Int?
+  notes            String?     @db.Text
+  includedExtras   Json        @default("[]")
+  status           OfferStatus @default(PENDING)
+  createdAt        DateTime    @default(now())
+  viewedAt         DateTime?
+
+  configuration CarConfiguration @relation(fields: [configurationId], references: [id], onDelete: Cascade)
+  dealer        Dealer           @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  @@index([configurationId])
+  @@index([dealerId])
+  @@index([status])
+  @@map("dealer_offers")
+}
+
+// ============================================================================
+// SELL MY CAR — AUCTION SYSTEM
+// ============================================================================
+
+model SellListing {
+  id                     String            @id @default(uuid())
+  sellerId               String
+  make                   String
+  model                  String
+  year                   Int
+  trim                   String?
+  mileageKm              Int
+  conditionDescription   String?           @db.Text
+  conditionCheckboxes    Json?
+  source                 CarSource
+  accidentHistory        Boolean?
+  askingPriceUsd         Decimal?          @db.Decimal(12, 2)
+  estimatedValueMinUsd   Decimal?          @db.Decimal(12, 2)
+  estimatedValueMaxUsd   Decimal?          @db.Decimal(12, 2)
+  images                 Json              @default("[]")
+  status                 SellListingStatus @default(PENDING_REVIEW)
+  auctionEndsAt          DateTime?
+  createdAt              DateTime          @default(now())
+
+  seller User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  bids   SellBid[]
+
+  @@index([status])
+  @@index([sellerId])
+  @@index([make, model])
+  @@index([createdAt(sort: Desc)])
+  @@map("sell_listings")
+}
+
+model SellBid {
+  id            String    @id @default(uuid())
+  sellListingId String
+  dealerId      String
+  bidAmountUsd  Decimal   @db.Decimal(12, 2)
+  notes         String?   @db.Text
+  status        BidStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+
+  sellListing SellListing @relation(fields: [sellListingId], references: [id], onDelete: Cascade)
+  dealer      Dealer      @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  @@index([sellListingId])
+  @@index([dealerId])
+  @@index([status])
+  @@map("sell_bids")
+}
+
+// ============================================================================
+// REVIEWS
+// ============================================================================
+
+model DealerReview {
+  id                   String       @id @default(uuid())
+  dealerId             String
+  buyerId              String
+  inquiryId            String?
+  ratingOverall        Int
+  ratingPriceFairness  Int
+  ratingCommunication  Int
+  ratingHonesty        Int
+  title                String?
+  body                 String?      @db.Text
+  isVerifiedPurchase   Boolean      @default(false)
+  dealerResponse       String?      @db.Text
+  dealerRespondedAt    DateTime?
+  status               ReviewStatus @default(PENDING_REVIEW)
+  createdAt            DateTime     @default(now())
+
+  dealer  Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  buyer   User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  inquiry Inquiry? @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+
+  @@index([dealerId])
+  @@index([buyerId])
+  @@index([status])
+  @@map("dealer_reviews")
+}
+
+model CarReview {
+  id                 String        @id @default(uuid())
+  slug               String        @unique
+  make               String
+  model              String
+  year               Int
+  titleEn            String
+  titleAr            String
+  contentEn          String        @db.Text
+  contentAr          String        @db.Text
+  excerptEn          String?
+  excerptAr          String?
+  prosEn             Json?
+  prosAr             Json?
+  consEn             Json?
+  consAr             Json?
+  verdictEn          String?       @db.Text
+  verdictAr          String?       @db.Text
+  ratingOverall      Decimal       @db.Decimal(3, 1)
+  ratingValue        Decimal       @db.Decimal(3, 1)
+  ratingInterior     Decimal       @db.Decimal(3, 1)
+  ratingPerformance  Decimal       @db.Decimal(3, 1)
+  ratingReliability  Decimal       @db.Decimal(3, 1)
+  ratingSafety       Decimal       @db.Decimal(3, 1)
+  authorId           String
+  featuredImageUrl   String?
+  gallery            Json?
+  youtubeVideoId     String?
+  seoTitleEn         String?
+  seoTitleAr         String?
+  seoDescriptionEn   String?
+  seoDescriptionAr   String?
+  seoKeywords        Json?
+  status             ContentStatus @default(DRAFT)
+  publishedAt        DateTime?
+  viewsCount         Int           @default(0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  author User @relation("CarReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([slug])
+  @@index([make, model])
+  @@index([status])
+  @@index([publishedAt(sort: Desc)])
+  @@map("car_reviews")
+}
+
+// ============================================================================
+// CONTENT — BLOG
+// ============================================================================
+
+model BlogPost {
+  id               String        @id @default(uuid())
+  slug             String        @unique
+  titleEn          String
+  titleAr          String
+  contentEn        String        @db.Text
+  contentAr        String        @db.Text
+  excerptEn        String?
+  excerptAr        String?
+  category         BlogCategory
+  tags             Json          @default("[]")
+  authorId         String
+  featuredImageUrl String?
+  seoTitleEn       String?
+  seoTitleAr       String?
+  seoDescriptionEn String?
+  seoDescriptionAr String?
+  status           ContentStatus @default(DRAFT)
+  publishedAt      DateTime?
+  viewsCount       Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  author User @relation("BlogAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([slug])
+  @@index([category])
+  @@index([status])
+  @@index([publishedAt(sort: Desc)])
+  @@map("blog_posts")
+}
+
+// ============================================================================
+// USER FEATURES — SAVED CARS, ALERTS, NOTIFICATIONS
+// ============================================================================
+
+model SavedCar {
+  id        String   @id @default(uuid())
+  userId    String
+  carId     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  car  Car  @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, carId])
+  @@index([userId])
+  @@index([carId])
+  @@map("saved_cars")
+}
+
+model SearchAlert {
+  id              String               @id @default(uuid())
+  userId          String
+  filters         Json
+  frequency       SearchAlertFrequency
+  isActive        Boolean              @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("search_alerts")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ============================================================================
+// REFERENCE DATA — MAKES & MODELS
+// ============================================================================
+
+model CarMake {
+  id        Int        @id @default(autoincrement())
+  nameEn    String
+  nameAr    String
+  slug      String     @unique
+  logoUrl   String?
+  isPopular Boolean    @default(false)
+  models    CarModel[]
+
+  @@index([slug])
+  @@index([isPopular])
+  @@map("car_makes")
+}
+
+model CarModel {
+  id             Int       @id @default(autoincrement())
+  makeId         Int
+  nameEn         String
+  nameAr         String
+  slug           String
+  bodyType       BodyType?
+  yearsAvailable Json?
+
+  make CarMake @relation(fields: [makeId], references: [id], onDelete: Cascade)
+
+  @@index([makeId])
+  @@index([slug])
+  @@map("car_models")
+}
+
+// ============================================================================
+// ADMIN
+// ============================================================================
+
+model AdminLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String?
+  targetId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_logs")
+}
