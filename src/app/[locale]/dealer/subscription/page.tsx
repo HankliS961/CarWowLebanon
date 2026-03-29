@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Check, X, CreditCard } from "lucide-react";
+import { Check, X, CreditCard, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +17,18 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { SUBSCRIPTION_TIER, TIER_LIMITS, type SubscriptionTier } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc/client";
 
 /** Dealer subscription management page with tier comparison and billing history. */
 export default function DealerSubscriptionPage() {
   const t = useTranslations("dealer.subscription");
 
-  // Current plan (would come from the dealer's profile)
-  const currentTier: SubscriptionTier = "FREE";
+  // Fetch the dealer's profile to get the current subscription tier
+  const { data: dealer, isLoading } = trpc.dealers.getMyProfile.useQuery(undefined, {
+    retry: false,
+  });
+
+  const currentTier: SubscriptionTier = (dealer?.subscriptionTier as SubscriptionTier) ?? "FREE";
 
   const tiers: SubscriptionTier[] = ["FREE", "BRONZE", "SILVER", "GOLD"];
   const tierNames: Record<SubscriptionTier, string> = {
@@ -69,6 +75,18 @@ export default function DealerSubscriptionPage() {
       getValue: (tier: SubscriptionTier) => String(TIER_LIMITS[tier].teamMembers),
     },
   ];
+
+  const handleUpgrade = (tier: SubscriptionTier) => {
+    toast.info(`To upgrade to ${tierNames[tier]}, please contact us at support@carsouk.com`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -190,6 +208,7 @@ export default function DealerSubscriptionPage() {
                   className="w-full"
                   variant={isCurrent ? "outline" : "default"}
                   disabled={isCurrent}
+                  onClick={() => !isCurrent && handleUpgrade(tier)}
                 >
                   {isCurrent ? "Current Plan" : t("upgrade")}
                 </Button>

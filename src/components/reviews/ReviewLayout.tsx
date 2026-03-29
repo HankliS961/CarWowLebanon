@@ -75,7 +75,7 @@ export function ReviewLayout({
           <div className="lg:col-span-2">
             <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-muted">
               <Image
-                src={featuredImageUrl || "/images/car-placeholder.webp"}
+                src={featuredImageUrl || "/images/car-placeholder.svg"}
                 alt={title}
                 fill
                 className="object-cover"

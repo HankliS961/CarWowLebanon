@@ -2,10 +2,19 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useSession, signOut } from "next-auth/react";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { NotificationBell } from "@/components/shared/NotificationBell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
   Menu,
@@ -22,6 +31,11 @@ import {
   BookOpen,
   Wrench,
   Building2,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  ShieldCheck,
+  Store,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
 
@@ -46,7 +60,12 @@ const NAV_ITEMS: NavItem[] = [
 export function Header() {
   const locale = useLocale() as Locale;
   const t = useTranslations("nav");
+  const { data: session, status } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isLoggedIn = status === "authenticated" && !!session?.user;
+  const userName = session?.user?.name || (locale === "ar" ? "حسابي" : "My Account");
+  const userInitials = userName.slice(0, 2).toUpperCase();
+  const userRole = (session?.user as any)?.role as string | undefined;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -106,23 +125,82 @@ export function Header() {
         <div className="flex items-center gap-2">
           <LanguageToggle />
 
-          <NotificationBell />
+          {isLoggedIn && <NotificationBell />}
 
-          <Link
-            href="/dashboard/saved"
-            className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
-            aria-label={t("savedCars")}
-          >
-            <Heart className="h-5 w-5" />
-          </Link>
+          {isLoggedIn && (
+            <Link
+              href="/dashboard/saved"
+              className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
+              aria-label={t("savedCars")}
+            >
+              <Heart className="h-5 w-5" />
+            </Link>
+          )}
 
-          <Link
-            href="/auth/login"
-            className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
-            aria-label={t("login")}
-          >
-            <User className="h-5 w-5" />
-          </Link>
+          {isLoggedIn ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="hidden items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex">
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={session.user?.image || undefined} />
+                    <AvatarFallback className="bg-teal-500 text-xs text-white">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-[100px] truncate md:inline">
+                    {userName}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    {locale === "ar" ? "لوحة التحكم" : "Dashboard"}
+                  </Link>
+                </DropdownMenuItem>
+                {(userRole === "DEALER" || userRole === "ADMIN") && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dealer" className="flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      {locale === "ar" ? "بوابة التاجر" : "Dealer Portal"}
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {userRole === "ADMIN" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" />
+                      {locale === "ar" ? "لوحة الإدارة" : "Admin Panel"}
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/settings" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    {locale === "ar" ? "الإعدادات" : "Settings"}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="flex items-center gap-2 text-red-600"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {locale === "ar" ? "تسجيل الخروج" : "Sign Out"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
+              aria-label={t("login")}
+            >
+              <User className="h-5 w-5" />
+            </Link>
+          )}
 
           <Button asChild size="sm" className="hidden sm:inline-flex">
             <Link href="/get-offers">{t("getOffers")}</Link>
@@ -155,14 +233,45 @@ export function Header() {
                 );
               })}
               <div className="my-2 border-t" />
-              <Link
-                href="/auth/login"
-                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <User className="h-4 w-4" />
-                {t("login")}
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    {locale === "ar" ? "لوحة التحكم" : "Dashboard"}
+                  </Link>
+                  <Link
+                    href="/dashboard/settings"
+                    className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Settings className="h-4 w-4" />
+                    {locale === "ar" ? "الإعدادات" : "Settings"}
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      signOut({ callbackUrl: "/" });
+                    }}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-muted"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {locale === "ar" ? "تسجيل الخروج" : "Sign Out"}
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="h-4 w-4" />
+                  {t("login")}
+                </Link>
+              )}
               <Button asChild className="mt-2 w-full">
                 <Link href="/get-offers" onClick={() => setMobileMenuOpen(false)}>
                   {t("getOffers")}

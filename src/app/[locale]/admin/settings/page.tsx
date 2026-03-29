@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
+import { trpc } from "@/lib/trpc/client";
 
 interface SystemSettingsForm {
   exchangeRate: number;
@@ -23,24 +24,54 @@ interface SystemSettingsForm {
 export default function AdminSettingsPage() {
   const t = useTranslations("admin.settings");
 
+  const utils = trpc.useUtils();
+
+  // Load the most recent UPDATE_SETTINGS log to pre-populate form
+  const { data: savedSettings } = trpc.admin.getLatestSettings.useQuery(undefined, { retry: false });
+
+  const updateSettings = trpc.admin.updateSettings.useMutation({
+    onSuccess: () => {
+      toast.success(t("saveSuccess"));
+      utils.admin.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // Default values used when no previous settings exist
+  const defaults: SystemSettingsForm = {
+    exchangeRate: 89500,
+    leadPricing: 10,
+    listingExpiry: 60,
+    auctionDuration: 168,
+    platformName: "CarSouk",
+    contactEmail: "admin@carsouk.com",
+  };
+
   const {
     register,
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<SystemSettingsForm>({
-    defaultValues: {
-      exchangeRate: 89500,
-      leadPricing: 10,
-      listingExpiry: 60,
-      auctionDuration: 168,
-      platformName: "CarSouk",
-      contactEmail: "admin@carsouk.com",
+    values: {
+      exchangeRate: (savedSettings?.exchangeRate as number) ?? defaults.exchangeRate,
+      leadPricing: (savedSettings?.leadFee as number) ?? defaults.leadPricing,
+      listingExpiry: defaults.listingExpiry,
+      auctionDuration: (savedSettings?.auctionDuration as number) ?? defaults.auctionDuration,
+      platformName: (savedSettings?.platformName as string) ?? defaults.platformName,
+      contactEmail: (savedSettings?.supportEmail as string) ?? defaults.contactEmail,
     },
   });
 
   const onSubmit = (data: SystemSettingsForm) => {
-    // TODO: Save system settings
-    toast.success(t("saveSuccess"));
+    updateSettings.mutate({
+      exchangeRate: data.exchangeRate,
+      leadFee: data.leadPricing,
+      auctionDuration: data.auctionDuration,
+      platformName: data.platformName,
+      supportEmail: data.contactEmail,
+    });
   };
 
   return (
@@ -131,8 +162,8 @@ export default function AdminSettingsPage() {
 
         <Separator />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : t("save")}
+          <Button type="submit" disabled={isSubmitting || updateSettings.isPending}>
+            {updateSettings.isPending ? "Saving..." : t("save")}
           </Button>
         </div>
       </form>

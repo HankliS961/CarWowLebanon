@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Users, MoreHorizontal, Shield, Ban, CheckCircle } from "lucide-react";
+import { Search, Users, MoreHorizontal, Shield, Ban } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -28,10 +29,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { trpc } from "@/lib/trpc/client";
+
+const ROLES = ["BUYER", "SELLER", "DEALER", "ADMIN"] as const;
 
 /** Admin user management page with search, role filter, and user actions. */
 export default function AdminUsersPage() {
@@ -40,23 +50,75 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
 
+  // Role edit dialog state
+  const [editRoleUser, setEditRoleUser] = useState<{ id: string; name: string | null; currentRole: string } | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("");
+
+  const utils = trpc.useUtils();
+
   const { data, isLoading } = trpc.admin.listUsers.useQuery(
     { page, limit: 25 },
     { retry: false }
   );
 
+  const changeUserRole = trpc.admin.changeUserRole.useMutation({
+    onSuccess: () => {
+      toast.success("User role updated successfully");
+      utils.admin.listUsers.invalidate();
+      setEditRoleUser(null);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const suspendUser = trpc.admin.suspendUser.useMutation({
+    onSuccess: () => {
+      toast.success("User suspended successfully");
+      utils.admin.listUsers.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   const users = data?.users ?? [];
   const totalPages = data?.totalPages ?? 1;
   const total = data?.total ?? 0;
 
-  const filteredUsers =
-    roleFilter === "all" ? users : users.filter((u) => u.role === roleFilter);
+  // Client-side filtering: role filter + search filter on name/email
+  const filteredUsers = users.filter((u) => {
+    const matchesRole = roleFilter === "all" || u.role === roleFilter;
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !query ||
+      (u.name ?? "").toLowerCase().includes(query) ||
+      u.email.toLowerCase().includes(query);
+    return matchesRole && matchesSearch;
+  });
 
   const roleColor: Record<string, string> = {
     BUYER: "bg-blue-100 text-blue-700",
     SELLER: "bg-green-100 text-green-700",
     DEALER: "bg-purple-100 text-purple-700",
     ADMIN: "bg-red-100 text-red-700",
+  };
+
+  const handleEditRole = (user: { id: string; name: string | null; role: string }) => {
+    setEditRoleUser({ id: user.id, name: user.name, currentRole: user.role });
+    setSelectedRole(user.role);
+  };
+
+  const handleConfirmRoleChange = () => {
+    if (!editRoleUser || !selectedRole) return;
+    changeUserRole.mutate({
+      userId: editRoleUser.id,
+      role: selectedRole as "BUYER" | "SELLER" | "DEALER" | "ADMIN",
+    });
+  };
+
+  const handleSuspend = (userId: string) => {
+    suspendUser.mutate({ userId, reason: "Suspended by admin" });
   };
 
   return (
@@ -148,15 +210,15 @@ export default function AdminUsersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditRole(user)}>
                                 <Shield className="mr-2 h-4 w-4" />
                                 Edit Role
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                {t("activate")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleSuspend(user.id)}
+                                disabled={suspendUser.isPending}
+                              >
                                 <Ban className="mr-2 h-4 w-4" />
                                 {t("suspend")}
                               </DropdownMenuItem>
@@ -177,6 +239,40 @@ export default function AdminUsersPage() {
           </>
         )}
       </Card>
+
+      {/* Edit Role Dialog */}
+      <Dialog open={!!editRoleUser} onOpenChange={(open) => !open && setEditRoleUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Change role for {editRoleUser?.name || "user"}
+            </DialogTitle>
+          </DialogHeader>
+          <Select value={selectedRole} onValueChange={setSelectedRole}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRoleUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmRoleChange}
+              disabled={changeUserRole.isPending || selectedRole === editRoleUser?.currentRole}
+            >
+              {changeUserRole.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

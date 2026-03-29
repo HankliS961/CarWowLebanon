@@ -1,186 +1,48 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Users, Plus, Trash2, Mail } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Users, Clock, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
-interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: "active" | "pending";
-  joinedAt: string;
-}
-
-/** Dealer team management page for inviting and managing team members. */
+/** Dealer team management page - currently a coming soon placeholder. */
 export default function DealerTeamPage() {
   const t = useTranslations("dealer.team");
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("salesRep");
-  const [removeId, setRemoveId] = useState<string | null>(null);
-
-  // Placeholder data
-  const members: TeamMember[] = [];
-
-  const handleInvite = () => {
-    if (!inviteEmail.trim()) return;
-    toast.success(t("inviteSuccess"));
-    setShowInvite(false);
-    setInviteEmail("");
-  };
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")}>
-        <Button onClick={() => setShowInvite(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t("inviteMember")}
-        </Button>
-      </PageHeader>
+      <PageHeader title={t("title")} />
 
       <Card>
-        {members.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={Users}
-              title={t("empty")}
-              description={t("emptyDescription")}
-              actionLabel={t("inviteMember")}
-              onAction={() => setShowInvite(true)}
-            />
+        <CardContent className="flex flex-col items-center py-16 text-center">
+          <div className="mb-4 rounded-full bg-muted p-4">
+            <Users className="h-10 w-10 text-muted-foreground" />
           </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="w-12">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell className="font-medium">{member.name}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{member.role}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={member.status === "active" ? "default" : "outline"}
-                    >
-                      {member.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(member.joinedAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRemoveId(member.id)}
-                      aria-label="Remove member"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+          <h3 className="text-lg font-semibold">Team Management Coming Soon</h3>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            We are working on team management features that will let you invite team members,
+            assign roles like Sales Representative and Manager, and control access to your
+            dealership portal.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col items-center rounded-lg border p-4">
+              <Users className="mb-2 h-6 w-6 text-primary" />
+              <p className="text-sm font-medium">Invite Members</p>
+              <p className="text-xs text-muted-foreground">Add your team via email</p>
+            </div>
+            <div className="flex flex-col items-center rounded-lg border p-4">
+              <Wrench className="mb-2 h-6 w-6 text-primary" />
+              <p className="text-sm font-medium">Role-Based Access</p>
+              <p className="text-xs text-muted-foreground">Control permissions per role</p>
+            </div>
+            <div className="flex flex-col items-center rounded-lg border p-4">
+              <Clock className="mb-2 h-6 w-6 text-primary" />
+              <p className="text-sm font-medium">Activity Logs</p>
+              <p className="text-xs text-muted-foreground">Track team actions</p>
+            </div>
+          </div>
+        </CardContent>
       </Card>
-
-      {/* Invite dialog */}
-      <Dialog open={showInvite} onOpenChange={setShowInvite}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("inviteMember")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="inviteEmail">{t("email")}</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="inviteEmail"
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="pl-9"
-                  placeholder="team@example.com"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("role")}</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="salesRep">{t("salesRep")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInvite(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleInvite} disabled={!inviteEmail.trim()}>
-              {t("invite")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Remove confirmation */}
-      <ConfirmDialog
-        open={!!removeId}
-        onOpenChange={(open) => !open && setRemoveId(null)}
-        title="Remove Team Member"
-        description="Are you sure you want to remove this team member? They will lose access to the dealer portal."
-        confirmLabel={t("remove")}
-        variant="destructive"
-        onConfirm={() => setRemoveId(null)}
-      />
     </div>
   );
 }

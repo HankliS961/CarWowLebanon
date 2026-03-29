@@ -41,13 +41,8 @@ export default function LoginPage() {
       if (result?.error) {
         setError(locale === "ar" ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password");
       } else {
-        // Redirect to callback URL or default based on context
-        if (callbackUrl) {
-          router.push(callbackUrl);
-        } else {
-          router.push(`/${locale}`);
-        }
-        router.refresh();
+        // Hard redirect to ensure session is picked up everywhere
+        window.location.href = callbackUrl || `/${locale}`;
       }
     } catch {
       setError(locale === "ar" ? "حدث خطأ، يرجى المحاولة مرة أخرى" : "Something went wrong. Please try again.");
@@ -122,13 +117,13 @@ export default function LoginPage() {
                 <Mail className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
                   placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="ps-10"
                   required
-                  autoComplete="email"
+                  autoComplete="email tel"
                 />
               </div>
             </div>
@@ -136,12 +131,9 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">{t("passwordLabel")}</Label>
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                >
+                <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
                   {t("forgotPassword")}
-                </button>
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

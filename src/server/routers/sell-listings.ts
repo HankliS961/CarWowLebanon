@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, publicProcedure, dealerProcedure } from "../trpc";
 import { estimateCarValue } from "@/lib/valuation/estimate";
 
@@ -10,12 +11,143 @@ const carSourceEnum = z.enum([
   "SALVAGE_REBUILT",
 ]);
 
+/** Shared schema for all optional sell-listing fields (used by saveDraft & create). */
+const draftFieldsSchema = z.object({
+  make: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  year: z.number().min(1900).max(2030).optional(),
+  trim: z.string().optional(),
+  mileageKm: z.number().min(0).optional(),
+  conditionDescription: z.string().optional(),
+  conditionCheckboxes: z.any().optional(),
+  source: carSourceEnum.optional(),
+  accidentHistory: z.boolean().optional(),
+  askingPriceUsd: z.number().positive().optional(),
+  estimatedValueMinUsd: z.number().positive().optional(),
+  estimatedValueMaxUsd: z.number().positive().optional(),
+  images: z.array(z.string()).optional(),
+  currentStep: z.number().min(1).optional(),
+});
+
 /** Sell Listings router — "Sell My Car" auction system. */
 export const sellListingsRouter = createTRPCRouter({
-  /** Create a new sell listing. */
+  // ---------------------------------------------------------------------------
+  // Draft procedures
+  // ---------------------------------------------------------------------------
+
+  /** Save (create or update) a draft sell listing. */
+  saveDraft: protectedProcedure
+    .input(draftFieldsSchema.extend({ draftId: z.string().uuid().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const { draftId, ...fields } = input;
+
+      if (draftId) {
+        // Update existing draft — verify ownership & status
+        const existing = await ctx.prisma.sellListing.findUnique({
+          where: { id: draftId },
+        });
+
+        if (!existing || existing.sellerId !== ctx.session.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Draft not found" });
+        }
+
+        if (existing.status !== "DRAFT") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only drafts can be updated via saveDraft",
+          });
+        }
+
+        return ctx.prisma.sellListing.update({
+          where: { id: draftId },
+          data: fields,
+        });
+      }
+
+      // Create a new draft
+      return ctx.prisma.sellListing.create({
+        data: {
+          ...fields,
+          sellerId: ctx.session.user.id,
+          status: "DRAFT",
+        },
+      });
+    }),
+
+  /** List all drafts for the current user. */
+  listDrafts: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.sellListing.findMany({
+      where: {
+        sellerId: ctx.session.user.id,
+        status: "DRAFT",
+      },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        make: true,
+        model: true,
+        year: true,
+        trim: true,
+        mileageKm: true,
+        currentStep: true,
+        updatedAt: true,
+        images: true,
+      },
+    });
+  }),
+
+  /** Get a single draft by ID (full data). */
+  getDraft: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const draft = await ctx.prisma.sellListing.findUnique({
+        where: { id: input.id },
+      });
+
+      if (
+        !draft ||
+        draft.sellerId !== ctx.session.user.id ||
+        draft.status !== "DRAFT"
+      ) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Draft not found" });
+      }
+
+      return draft;
+    }),
+
+  /** Delete a draft sell listing. */
+  deleteDraft: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const draft = await ctx.prisma.sellListing.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!draft || draft.sellerId !== ctx.session.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Draft not found" });
+      }
+
+      if (draft.status !== "DRAFT") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only drafts can be deleted via deleteDraft",
+        });
+      }
+
+      await ctx.prisma.sellListing.delete({ where: { id: input.id } });
+
+      return { success: true };
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Create / submit listing
+  // ---------------------------------------------------------------------------
+
+  /** Create a new sell listing (or promote an existing draft to PENDING_REVIEW). */
   create: protectedProcedure
     .input(
       z.object({
+        draftId: z.string().uuid().optional(),
         make: z.string().min(1),
         model: z.string().min(1),
         year: z.number().min(1900).max(2030),
@@ -33,18 +165,45 @@ export const sellListingsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { isAuction, ...data } = input;
+      const { isAuction, draftId, ...data } = input;
 
       // Calculate auction end time: 24 hours for auction, 7 days for fixed price
       const durationMs = isAuction
         ? 24 * 60 * 60 * 1000
         : 7 * 24 * 60 * 60 * 1000;
 
+      // If promoting an existing draft, update it instead of creating a new row
+      if (draftId) {
+        const existing = await ctx.prisma.sellListing.findUnique({
+          where: { id: draftId },
+        });
+
+        if (!existing || existing.sellerId !== ctx.session.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Draft not found" });
+        }
+
+        if (existing.status !== "DRAFT") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only drafts can be submitted",
+          });
+        }
+
+        return ctx.prisma.sellListing.update({
+          where: { id: draftId },
+          data: {
+            ...data,
+            status: "LIVE",
+            auctionEndsAt: new Date(Date.now() + durationMs),
+          },
+        });
+      }
+
       return ctx.prisma.sellListing.create({
         data: {
           ...data,
           sellerId: ctx.session.user.id,
-          status: "PENDING_REVIEW",
+          status: "LIVE",
           auctionEndsAt: new Date(Date.now() + durationMs),
         },
       });
@@ -181,11 +340,11 @@ export const sellListingsRouter = createTRPCRouter({
       });
 
       if (!listing || listing.sellerId !== ctx.session.user.id) {
-        throw new Error("Listing not found or unauthorized");
+        throw new TRPCError({ code: "FORBIDDEN", message: "Listing not found or unauthorized" });
       }
 
       if (listing.status === "SOLD") {
-        throw new Error("Cannot cancel a sold listing");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot cancel a sold listing" });
       }
 
       await ctx.prisma.$transaction([

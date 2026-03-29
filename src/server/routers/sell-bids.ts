@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, dealerProcedure } from "../trpc";
 import { notifyNewBid, notifyBidAccepted } from "@/lib/notifications/create";
 import { sendNewBidEmail, sendBidAcceptedEmail } from "@/lib/notifications/email";
@@ -18,7 +19,7 @@ export const sellBidsRouter = createTRPCRouter({
       const dealer = await ctx.prisma.dealer.findUnique({
         where: { userId: ctx.session.user.id },
       });
-      if (!dealer) throw new Error("Dealer profile not found");
+      if (!dealer) throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
 
       // Validate the listing is still live
       const listing = await ctx.prisma.sellListing.findUnique({
@@ -27,11 +28,11 @@ export const sellBidsRouter = createTRPCRouter({
       });
 
       if (!listing || listing.status !== "LIVE") {
-        throw new Error("Listing is not available for bidding");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Listing is not available for bidding" });
       }
 
       if (listing.auctionEndsAt && listing.auctionEndsAt < new Date()) {
-        throw new Error("Auction has ended");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Auction has ended" });
       }
 
       // Check minimum bid increment ($100)
@@ -41,7 +42,7 @@ export const sellBidsRouter = createTRPCRouter({
       });
 
       if (highestBid && Number(input.bidAmountUsd) <= Number(highestBid.bidAmountUsd)) {
-        throw new Error("Bid must be higher than the current highest bid");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Bid must be higher than the current highest bid" });
       }
 
       // Check if dealer already bid on this listing
@@ -115,11 +116,11 @@ export const sellBidsRouter = createTRPCRouter({
       });
 
       if (!bid || bid.sellListing.sellerId !== ctx.session.user.id) {
-        throw new Error("Bid not found or unauthorized");
+        throw new TRPCError({ code: "FORBIDDEN", message: "Bid not found or unauthorized" });
       }
 
       if (bid.sellListing.status === "SOLD") {
-        throw new Error("This listing is already sold");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This listing is already sold" });
       }
 
       await ctx.prisma.$transaction([
@@ -168,7 +169,7 @@ export const sellBidsRouter = createTRPCRouter({
     const dealer = await ctx.prisma.dealer.findUnique({
       where: { userId: ctx.session.user.id },
     });
-    if (!dealer) throw new Error("Dealer profile not found");
+    if (!dealer) throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
 
     return ctx.prisma.sellBid.findMany({
       where: { dealerId: dealer.id },

@@ -139,7 +139,7 @@ export default async function ReviewsIndexPage({
                 >
                   <div className="relative aspect-[16/10] w-full overflow-hidden">
                     <Image
-                      src={review.featuredImageUrl || "/images/car-placeholder.webp"}
+                      src={review.featuredImageUrl || "/images/car-placeholder.svg"}
                       alt={`${review.make} ${review.model} ${review.year}`}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"

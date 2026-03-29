@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import {
   Plus,
   Upload,
@@ -47,25 +48,57 @@ export default function DealerListingsPage() {
   const params = useParams();
   const locale = (params.locale as string) || "en";
   const t = useTranslations("dealer.listings");
+  const utils = trpc.useUtils();
 
   const [activeTab, setActiveTab] = useState<ListingTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = trpc.cars.list.useQuery(
+  const { data, isLoading } = trpc.cars.listForDealer.useQuery(
     { page, limit: 20, sort: "newest" },
     { retry: false }
   );
+
+  const deleteMutation = trpc.cars.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Listing deleted successfully");
+      utils.cars.invalidate();
+      setDeleteId(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete listing");
+      setDeleteId(null);
+    },
+  });
 
   const cars = data?.cars ?? [];
   const totalPages = data?.totalPages ?? 1;
   const total = data?.total ?? 0;
 
-  const filteredCars =
-    activeTab === "all"
+  // Filter by tab status and search query (client-side on make/model)
+  const filteredCars = useMemo(() => {
+    let result = activeTab === "all"
       ? cars
       : cars.filter((car) => car.status === activeTab);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (car) =>
+          car.make.toLowerCase().includes(q) ||
+          car.model.toLowerCase().includes(q) ||
+          (car.trim && car.trim.toLowerCase().includes(q))
+      );
+    }
+
+    return result;
+  }, [cars, activeTab, searchQuery]);
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteMutation.mutate({ carId: deleteId });
+  };
 
   return (
     <div className="space-y-6">
@@ -89,7 +122,10 @@ export default function DealerListingsPage() {
             className="pl-9"
           />
         </div>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          onClick={() => toast.info("CSV import coming soon")}
+        >
           <Upload className="mr-2 h-4 w-4" />
           {t("csvImport")}
         </Button>
@@ -236,7 +272,7 @@ export default function DealerListingsPage() {
         description={t("deleteConfirm")}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={() => setDeleteId(null)}
+        onConfirm={handleDelete}
       />
     </div>
   );

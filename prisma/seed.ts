@@ -346,6 +346,42 @@ async function main() {
     },
   });
 
+  // --- Buyer Users ---
+  console.log("Seeding buyer users...");
+  const buyerPassword = await hash("Buyer123!", 12);
+
+  const buyer1 = await prisma.user.upsert({
+    where: { email: "sara@example.com" },
+    update: {},
+    create: {
+      email: "sara@example.com",
+      name: "Sara Nassar",
+      phone: "+961701234567",
+      passwordHash: buyerPassword,
+      role: UserRole.BUYER,
+      isVerified: true,
+      locationRegion: Region.BEIRUT,
+      languagePref: Language.AR,
+    },
+  });
+
+  const buyer2 = await prisma.user.upsert({
+    where: { email: "mike@example.com" },
+    update: {},
+    create: {
+      email: "mike@example.com",
+      name: "Mike Chamoun",
+      phone: "+961709876543",
+      passwordHash: buyerPassword,
+      role: UserRole.BUYER,
+      isVerified: true,
+      locationRegion: Region.MOUNT_LEBANON,
+      languagePref: Language.EN,
+    },
+  });
+  console.log(`  Buyer 1: ${buyer1.email}`);
+  console.log(`  Buyer 2: ${buyer2.email}`);
+
   // --- Sample Car Listings ---
   console.log("Seeding car listings...");
   const sampleCars = [
@@ -495,10 +531,125 @@ async function main() {
     },
   ];
 
+  const createdCars = [];
   for (const car of sampleCars) {
-    await prisma.car.create({ data: car });
+    const c = await prisma.car.create({ data: car });
+    createdCars.push(c);
   }
   console.log(`  Created ${sampleCars.length} car listings.`);
+
+  // --- More Cars (variety for new/used pages) ---
+  console.log("Seeding additional car listings...");
+  const moreCars = [
+    {
+      dealerId: dealer2.id, status: ListingStatus.ACTIVE, condition: CarCondition.NEW, source: CarSource.LOCAL,
+      make: "Kia", model: "Sportage", year: 2025, trim: "GT-Line", bodyType: BodyType.SUV,
+      mileageKm: 0, fuelType: FuelType.GASOLINE, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.AWD,
+      engineSize: "1.6L Turbo", horsepower: 180, colorExterior: "Runway Red",
+      descriptionEn: "All-new 2025 Kia Sportage GT-Line. Bold design with cutting-edge technology.", descriptionAr: "كيا سبورتاج GT-لاين 2025 الجديدة كلياً. تصميم جريء مع تقنية متطورة.",
+      priceUsd: 32000, isNegotiable: true, isFeatured: false, locationRegion: Region.MOUNT_LEBANON, locationCity: "Jounieh",
+      features: ["Dual Panoramic Display", "Remote Parking", "Highway Driving Assist"], images: [], customsPaid: true,
+    },
+    {
+      dealerId: dealer2.id, status: ListingStatus.ACTIVE, condition: CarCondition.NEW, source: CarSource.LOCAL,
+      make: "Honda", model: "Civic", year: 2024, trim: "RS", bodyType: BodyType.SEDAN,
+      mileageKm: 0, fuelType: FuelType.GASOLINE, transmission: Transmission.CVT, drivetrain: Drivetrain.FWD,
+      engineSize: "1.5L Turbo", horsepower: 182, colorExterior: "Platinum White Pearl",
+      descriptionEn: "2024 Honda Civic RS Turbo. Sporty, efficient, and packed with tech.", descriptionAr: "هوندا سيفيك RS تيربو 2024. رياضية واقتصادية ومليئة بالتقنيات.",
+      priceUsd: 28000, isNegotiable: false, isFeatured: false, locationRegion: Region.MOUNT_LEBANON, locationCity: "Jounieh",
+      features: ["Honda Sensing", "Bose Sound", "Wireless CarPlay"], images: [], customsPaid: true,
+    },
+    {
+      dealerId: dealer1.id, status: ListingStatus.ACTIVE, condition: CarCondition.NEW, source: CarSource.LOCAL,
+      make: "BYD", model: "Atto 3", year: 2025, trim: "Extended Range", bodyType: BodyType.SUV,
+      mileageKm: 0, fuelType: FuelType.ELECTRIC, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.FWD,
+      engineSize: "Electric", horsepower: 204, colorExterior: "Ski White",
+      descriptionEn: "2025 BYD Atto 3 Electric. Zero emissions, 420km range, and loaded with features.", descriptionAr: "بي واي دي أتو 3 كهربائية 2025. صفر انبعاثات، مدى 420 كم، ومحملة بالميزات.",
+      priceUsd: 35000, isNegotiable: true, isFeatured: true, locationRegion: Region.BEIRUT, locationCity: "Beirut",
+      features: ["420km Range", "V2L", "Rotating Touchscreen", "NFC Key"], images: [], customsPaid: true,
+    },
+    {
+      dealerId: dealer1.id, status: ListingStatus.ACTIVE, condition: CarCondition.USED, source: CarSource.IMPORTED_GULF,
+      make: "Toyota", model: "Land Cruiser", year: 2023, trim: "VXR", bodyType: BodyType.SUV,
+      mileageKm: 28000, fuelType: FuelType.GASOLINE, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.FOUR_WD,
+      engineSize: "3.5L Twin Turbo V6", horsepower: 409, colorExterior: "Pearl White",
+      descriptionEn: "2023 Toyota Land Cruiser VXR imported from Dubai. Fully loaded with GCC specs.", descriptionAr: "تويوتا لاند كروزر VXR 2023 مستوردة من دبي. فل أوبشن مواصفات خليجية.",
+      priceUsd: 95000, isNegotiable: true, isFeatured: true, locationRegion: Region.BEIRUT, locationCity: "Beirut",
+      features: ["Crawl Control", "Multi-Terrain Select", "JBL Sound", "Rear Entertainment"], images: [], customsPaid: true, accidentHistory: false,
+    },
+    {
+      dealerId: dealer2.id, status: ListingStatus.ACTIVE, condition: CarCondition.USED, source: CarSource.IMPORTED_USA,
+      make: "Kia", model: "K5", year: 2023, trim: "GT", bodyType: BodyType.SEDAN,
+      mileageKm: 22000, fuelType: FuelType.GASOLINE, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.FWD,
+      engineSize: "2.5L Turbo", horsepower: 290, colorExterior: "Wolf Gray",
+      descriptionEn: "2023 Kia K5 GT from the USA. Clean title, powerful turbo engine. A real sleeper sedan.", descriptionAr: "كيا K5 GT 2023 من أمريكا. سجل نظيف، محرك تيربو قوي.",
+      priceUsd: 26000, isNegotiable: true, isFeatured: false, locationRegion: Region.MOUNT_LEBANON, locationCity: "Jounieh",
+      features: ["GT Sport Seats", "Launch Control", "Bose Audio", "360 Camera"], images: [], customsPaid: true, accidentHistory: false,
+    },
+    {
+      dealerId: dealer1.id, status: ListingStatus.ACTIVE, condition: CarCondition.USED, source: CarSource.LOCAL,
+      make: "Audi", model: "Q5", year: 2022, trim: "Premium Plus", bodyType: BodyType.SUV,
+      mileageKm: 40000, fuelType: FuelType.GASOLINE, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.AWD,
+      engineSize: "2.0L Turbo", horsepower: 261, colorExterior: "Navarra Blue",
+      descriptionEn: "2022 Audi Q5 Premium Plus. Local car, full service history at dealer. Excellent condition.", descriptionAr: "أودي Q5 بريميوم بلس 2022. سيارة محلية، سجل صيانة كامل عند الوكيل. حالة ممتازة.",
+      priceUsd: 48000, isNegotiable: true, isFeatured: false, locationRegion: Region.BEIRUT, locationCity: "Beirut",
+      features: ["Virtual Cockpit", "Bang & Olufsen", "Matrix LED", "Adaptive Air Suspension"], images: [], customsPaid: true, accidentHistory: false,
+    },
+    {
+      dealerId: dealer2.id, status: ListingStatus.ACTIVE, condition: CarCondition.NEW, source: CarSource.LOCAL,
+      make: "Hyundai", model: "Tucson", year: 2025, trim: "Limited", bodyType: BodyType.SUV,
+      mileageKm: 0, fuelType: FuelType.HYBRID, transmission: Transmission.AUTOMATIC, drivetrain: Drivetrain.AWD,
+      engineSize: "1.6L Turbo Hybrid", horsepower: 230, colorExterior: "Amazon Gray",
+      descriptionEn: "2025 Hyundai Tucson Limited Hybrid. Best-in-class fuel economy with premium features.", descriptionAr: "هيونداي توسان ليمتد هايبرد 2025. أفضل اقتصادية في فئتها مع ميزات فاخرة.",
+      priceUsd: 36000, isNegotiable: false, isFeatured: false, locationRegion: Region.MOUNT_LEBANON, locationCity: "Jounieh",
+      features: ["Hybrid Powertrain", "BOSE Premium Audio", "Blind Spot View Monitor", "Remote Smart Park"], images: [], customsPaid: true,
+    },
+  ];
+
+  for (const car of moreCars) {
+    await prisma.car.create({ data: car });
+  }
+  console.log(`  Created ${moreCars.length} additional car listings.`);
+
+  // --- Sample Inquiries ---
+  console.log("Seeding sample inquiries...");
+  if (createdCars[0]) {
+    await prisma.inquiry.create({
+      data: {
+        carId: createdCars[0].id,
+        buyerId: buyer1.id,
+        dealerId: dealer1.id,
+        message: "Hi, is this car still available? Can I schedule a test drive this weekend?",
+        preferredContact: "WHATSAPP",
+        status: "NEW",
+      },
+    });
+  }
+  if (createdCars[2]) {
+    await prisma.inquiry.create({
+      data: {
+        carId: createdCars[2].id,
+        buyerId: buyer2.id,
+        dealerId: dealer2.id,
+        message: "What's the best price you can offer? I'm looking to buy this week.",
+        preferredContact: "CALL",
+        status: "NEW",
+      },
+    });
+  }
+  console.log("  Created sample inquiries.");
+
+  // --- Sample Notifications ---
+  console.log("Seeding sample notifications...");
+  await prisma.notification.createMany({
+    data: [
+      { userId: buyer1.id, type: "NEW_INQUIRY", title: "Inquiry Sent", body: "Your inquiry about the Mercedes C-Class has been sent to Beirut Premium Motors.", isRead: false },
+      { userId: buyer1.id, type: "LISTING_MATCH", title: "New Listing Match", body: "A new Toyota Land Cruiser matching your search was just listed!", isRead: false },
+      { userId: dealerUser1.id, type: "NEW_INQUIRY", title: "New Inquiry", body: "Sara Nassar is interested in your Mercedes-Benz C-Class 2024.", isRead: false },
+      { userId: dealerUser2.id, type: "NEW_INQUIRY", title: "New Inquiry", body: "Mike Chamoun is interested in your Toyota Corolla 2024.", isRead: false },
+    ],
+  });
+  console.log("  Created sample notifications.");
 
   // --- Blog Posts ---
   console.log("Seeding blog posts...");

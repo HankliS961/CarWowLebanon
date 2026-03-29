@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const alertFiltersSchema = z.object({
@@ -50,7 +51,7 @@ export const searchAlertsRouter = createTRPCRouter({
       const alert = await ctx.prisma.searchAlert.findUnique({
         where: { id: input.id, userId: ctx.session.user.id },
       });
-      if (!alert) throw new Error("Alert not found");
+      if (!alert) throw new TRPCError({ code: "NOT_FOUND", message: "Alert not found" });
 
       return ctx.prisma.searchAlert.update({
         where: { id: input.id },

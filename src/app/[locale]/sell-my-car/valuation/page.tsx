@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
 import { useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,128 @@ export default function ValuationFormPage() {
   const locale = useLocale() as Locale;
   const t = useTranslations("sell.form");
   const router = useRouter();
+  const { data: session } = useSession();
   const store = useSellFormStore();
+  const utils = trpc.useUtils();
+
+  // ── Draft persistence state ──────────────────────────────────────────
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+
+  // Fetch the user's existing drafts
+  const { data: drafts } = trpc.sellListings.listDrafts.useQuery(undefined, {
+    enabled: !!session?.user,
+  });
+
+  // Save-draft mutation
+  const saveDraftMutation = trpc.sellListings.saveDraft.useMutation({
+    onSuccess: (data) => {
+      if (!activeDraftId) {
+        setActiveDraftId(data.id);
+      }
+      utils.sellListings.listDrafts.invalidate();
+    },
+  });
+
+  // Load a specific draft from DB
+  const { data: loadedDraft } = trpc.sellListings.getDraft.useQuery(
+    { id: activeDraftId! },
+    { enabled: !!activeDraftId }
+  );
+
+  // When a draft finishes loading, populate the Zustand store
+  useEffect(() => {
+    if (loadedDraft) {
+      store.reset();
+      if (loadedDraft.make) store.updateField("make", loadedDraft.make);
+      if (loadedDraft.model) store.updateField("model", loadedDraft.model);
+      if (loadedDraft.year) store.updateField("year", String(loadedDraft.year));
+      if (loadedDraft.trim) store.updateField("trim", loadedDraft.trim);
+      if (loadedDraft.mileageKm) store.updateField("mileageKm", String(loadedDraft.mileageKm));
+      if (loadedDraft.source) store.updateField("source", loadedDraft.source as any);
+      if (loadedDraft.accidentHistory !== undefined && loadedDraft.accidentHistory !== null)
+        store.updateField("accidentHistory", loadedDraft.accidentHistory);
+      if (loadedDraft.conditionDescription)
+        store.updateField("additionalNotes", loadedDraft.conditionDescription);
+      if (loadedDraft.conditionCheckboxes) {
+        const cb = loadedDraft.conditionCheckboxes as {
+          serviceRecords?: string;
+          numberOfKeys?: string;
+          hasDamage?: boolean;
+          damageTypes?: string[];
+        };
+        if (cb.serviceRecords) store.updateField("serviceRecords", cb.serviceRecords as any);
+        if (cb.numberOfKeys) store.updateField("numberOfKeys", cb.numberOfKeys as any);
+        if (cb.hasDamage !== undefined && cb.hasDamage !== null) store.updateField("hasDamage", cb.hasDamage);
+        if (cb.damageTypes) store.updateField("damageTypes", cb.damageTypes);
+      }
+      if (loadedDraft.images && Array.isArray(loadedDraft.images)) {
+        const photos: Record<string, string> = {};
+        (loadedDraft.images as string[]).forEach((url, idx) => {
+          photos[`slot-${idx}`] = url;
+        });
+        // Set photos one-by-one via setPhoto to keep store consistent
+        Object.entries(photos).forEach(([slot, url]) => store.setPhoto(slot, url));
+      }
+      if (loadedDraft.askingPriceUsd)
+        store.updateField("askingPrice", String(loadedDraft.askingPriceUsd));
+      if (loadedDraft.currentStep) store.setStep(loadedDraft.currentStep);
+      if (session?.user?.id) store.updateField("userId", session.user.id);
+    }
+  }, [loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Persist current form state to the database. */
+  const saveCurrentDraft = (opts?: { showToast?: boolean }) => {
+    saveDraftMutation.mutate(
+      {
+        draftId: activeDraftId || undefined,
+        make: store.make || undefined,
+        model: store.model || undefined,
+        year: store.year ? parseInt(store.year, 10) : undefined,
+        trim: store.trim || undefined,
+        mileageKm: store.mileageKm ? parseInt(store.mileageKm, 10) : undefined,
+        source: store.source || undefined,
+        accidentHistory: store.accidentHistory ?? undefined,
+        conditionCheckboxes: {
+          serviceRecords: store.serviceRecords || undefined,
+          numberOfKeys: store.numberOfKeys || undefined,
+          hasDamage: store.hasDamage ?? undefined,
+          damageTypes: store.damageTypes,
+        },
+        conditionDescription: store.additionalNotes || undefined,
+        images: Object.values(store.photos).filter(Boolean),
+        askingPriceUsd:
+          store.sellingOption === "asking_price" && store.askingPrice
+            ? parseFloat(store.askingPrice)
+            : undefined,
+        currentStep: store.currentStep,
+      },
+      {
+        onSuccess: () => {
+          if (opts?.showToast) {
+            toast.success(t("draftSaved"));
+          }
+        },
+      }
+    );
+  };
+
+  /** Load a draft by id — sets activeDraftId which triggers the getDraft query. */
+  const loadDraft = (draftId: string) => {
+    setActiveDraftId(draftId);
+  };
+
+  // Clear draft if it belongs to a different user
+  useEffect(() => {
+    if (session?.user?.id) {
+      if (store.userId && store.userId !== session.user.id) {
+        store.reset();
+        setActiveDraftId(null);
+      }
+      if (!store.userId) {
+        store.updateField("userId", session.user.id);
+      }
+    }
+  }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stepLabels = [
     t("carDetails"),
@@ -137,6 +259,8 @@ export default function ValuationFormPage() {
   const createListing = trpc.sellListings.create.useMutation({
     onSuccess: () => {
       store.reset();
+      setActiveDraftId(null);
+      utils.sellListings.listDrafts.invalidate();
       toast.success(locale === "ar" ? "تم إرسال إعلانك بنجاح!" : "Your listing has been submitted!");
       router.push("/dashboard/selling");
     },
@@ -146,7 +270,7 @@ export default function ValuationFormPage() {
   });
 
   const saveDraft = () => {
-    toast.success(t("draftSaved"));
+    saveCurrentDraft({ showToast: true });
   };
 
   const canProceedStep1 = store.make && store.model && store.year && store.mileageKm && store.source;
@@ -154,8 +278,14 @@ export default function ValuationFormPage() {
   const canProceedStep3 = Object.keys(store.photos).length >= 4;
   const canProceedStep4 = store.sellingOption === "auction" || (store.sellingOption === "asking_price" && store.askingPrice);
 
+  const handleNext = () => {
+    saveCurrentDraft(); // auto-save to DB on step advance
+    store.nextStep();
+  };
+
   const handleSubmit = () => {
     createListing.mutate({
+      draftId: activeDraftId || undefined,
       make: store.make,
       model: store.model,
       year: parseInt(store.year, 10),
@@ -184,6 +314,45 @@ export default function ValuationFormPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             {t("stepOf", { current: store.currentStep, total: 5 })}
           </p>
+
+          {/* ── Drafts picker ───────────────────────────────────── */}
+          {drafts && drafts.length > 0 && !activeDraftId && (
+            <div className="mb-6 mt-4">
+              <h3 className="text-sm font-semibold mb-2">
+                {locale === "ar" ? "متابعة مسودة" : "Continue a draft"}
+              </h3>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {drafts.map((draft) => (
+                  <button
+                    key={draft.id}
+                    onClick={() => loadDraft(draft.id)}
+                    className="flex-shrink-0 rounded-lg border p-3 text-start hover:border-teal-500 hover:bg-teal-50/50 transition-colors"
+                  >
+                    <p className="text-sm font-medium">
+                      {(draft as any).make || "Unknown"}{" "}
+                      {(draft as any).model || ""}{" "}
+                      {(draft as any).year || ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {locale === "ar" ? "خطوة" : "Step"}{" "}
+                      {(draft as any).currentStep || 1}/5 &middot;{" "}
+                      {new Date((draft as any).updatedAt).toLocaleDateString()}
+                    </p>
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    store.reset();
+                    setActiveDraftId(null);
+                  }}
+                  className="flex-shrink-0 rounded-lg border border-dashed p-3 text-sm text-muted-foreground hover:border-teal-500 hover:text-teal-600 transition-colors"
+                >
+                  + {locale === "ar" ? "إعلان جديد" : "New listing"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <StepIndicator
             currentStep={store.currentStep}
             totalSteps={5}
@@ -577,14 +746,23 @@ export default function ValuationFormPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={saveDraft}>
-              <Save className="me-2 h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={saveDraft}
+              disabled={saveDraftMutation.isPending}
+            >
+              {saveDraftMutation.isPending ? (
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="me-2 h-4 w-4" />
+              )}
               {t("saveDraft")}
             </Button>
 
             {store.currentStep < 5 ? (
               <Button
-                onClick={store.nextStep}
+                onClick={handleNext}
                 disabled={
                   (store.currentStep === 1 && !canProceedStep1) ||
                   (store.currentStep === 2 && !canProceedStep2) ||

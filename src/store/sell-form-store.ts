@@ -13,6 +13,9 @@ export type SellingOption = "auction" | "asking_price";
 export type ContactPref = "WHATSAPP" | "CALL" | "EMAIL";
 
 export interface SellFormState {
+  /** User ID that owns this draft — clears if different user loads it. */
+  userId: string;
+
   /** Current step (1-5). */
   currentStep: number;
 
@@ -56,6 +59,7 @@ export interface SellFormState {
 }
 
 const initialState = {
+  userId: "",
   currentStep: 1,
   make: "",
   makeSlug: "",
@@ -110,6 +114,7 @@ export const useSellFormStore = create<SellFormState>()(
     {
       name: "carsouk-sell-form-draft",
       partialize: (state) => ({
+        userId: state.userId,
         currentStep: state.currentStep,
         make: state.make,
         makeSlug: state.makeSlug,

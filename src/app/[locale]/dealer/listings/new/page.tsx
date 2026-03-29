@@ -54,9 +54,12 @@ export default function NewListingPage() {
 
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
 
+  const utils = trpc.useUtils();
+
   const createListing = trpc.cars.create.useMutation({
     onSuccess: () => {
       toast.success(t("success"));
+      utils.cars.invalidate();
       router.push(`/${locale}/dealer/listings`);
     },
     onError: (error) => {
@@ -69,6 +72,16 @@ export default function NewListingPage() {
       ...data,
       features: selectedFeatures,
     } as Parameters<typeof createListing.mutate>[0]);
+  };
+
+  const onSaveDraft = () => {
+    handleSubmit((data: CarListingInput) => {
+      createListing.mutate({
+        ...data,
+        features: selectedFeatures,
+        status: "DRAFT",
+      } as Parameters<typeof createListing.mutate>[0]);
+    })();
   };
 
   const toggleFeature = (feature: string) => {
@@ -456,7 +469,7 @@ export default function NewListingPage() {
           >
             Cancel
           </Button>
-          <Button type="button" variant="secondary">
+          <Button type="button" variant="secondary" onClick={onSaveDraft} disabled={isSubmitting || createListing.isPending}>
             {t("saveDraft")}
           </Button>
           <Button type="submit" disabled={isSubmitting || createListing.isPending}>

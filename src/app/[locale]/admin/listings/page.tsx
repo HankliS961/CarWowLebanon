@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Car, AlertTriangle, Star, CheckCircle, Trash2, AlertOctagon } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -29,20 +30,68 @@ export default function AdminListingsPage() {
   const [activeTab, setActiveTab] = useState<ListingTab>("all");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = trpc.cars.list.useQuery(
+  const utils = trpc.useUtils();
+
+  // All listings for the "all" and "featured" tabs — admin sees all statuses
+  const { data, isLoading: allLoading } = trpc.cars.list.useQuery(
     { page, limit: 25, sort: "newest" },
-    { retry: false }
+    { enabled: activeTab !== "flagged", retry: false }
   );
 
-  const cars = data?.cars ?? [];
-  const totalPages = data?.totalPages ?? 1;
-  const total = data?.total ?? 0;
+  // Also fetch flagged/warned listings for the "all" tab to show complete picture
+  const { data: nonActiveData } = trpc.admin.getListingsFlagged.useQuery(
+    undefined,
+    { enabled: activeTab === "all", retry: false }
+  );
+
+  // Flagged listings (non-ACTIVE) from admin endpoint for the "flagged" tab
+  const { data: flaggedData, isLoading: flaggedLoading } = trpc.admin.getListingsFlagged.useQuery(
+    undefined,
+    { enabled: activeTab === "flagged", retry: false }
+  );
+
+  const moderateListing = trpc.admin.moderateListing.useMutation({
+    onSuccess: (_data, variables) => {
+      const actionMessages: Record<string, { title: string; desc: string }> = {
+        APPROVE: { title: "Listing Approved", desc: "The listing has been restored to active status." },
+        REMOVE: { title: "Listing Removed", desc: "The listing has been set to expired and is no longer visible." },
+        WARN: { title: "Dealer Warned", desc: "The listing status is now 'Warned'. The dealer needs to make changes." },
+        REVOKE_WARN: { title: "Warning Revoked", desc: "The listing has been restored to active status." },
+      };
+      const msg = actionMessages[variables.action];
+      toast.success(msg?.title ?? "Action completed", { description: msg?.desc });
+      utils.cars.list.invalidate();
+      utils.admin.getListingsFlagged.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const isLoading = activeTab === "flagged" ? flaggedLoading : allLoading;
+
+  const allCars = data?.cars ?? [];
+  const totalPages = activeTab === "flagged" ? 1 : (data?.totalPages ?? 1);
+  const total = activeTab === "flagged" ? (flaggedData?.length ?? 0) : (data?.total ?? 0);
+
+  // Resolve displayed cars based on active tab
+  const filteredCars = (() => {
+    if (activeTab === "flagged") return flaggedData ?? [];
+    if (activeTab === "featured") return allCars.filter((car) => car.isFeatured === true);
+    // "all" tab: merge ACTIVE cars with non-active (warned, expired, draft) for full picture
+    const nonActive = nonActiveData ?? [];
+    return [...allCars, ...nonActive];
+  })();
+
+  const handleModerate = (carId: string, action: "APPROVE" | "REMOVE" | "WARN") => {
+    moderateListing.mutate({ carId, action });
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader title={t("title")} />
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ListingTab)}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as ListingTab); setPage(1); }}>
         <TabsList>
           <TabsTrigger value="all">{t("tabs.all")}</TabsTrigger>
           <TabsTrigger value="flagged">
@@ -57,7 +106,7 @@ export default function AdminListingsPage() {
 
         <TabsContent value={activeTab} className="mt-4">
           <Card>
-            {cars.length === 0 && !isLoading ? (
+            {filteredCars.length === 0 && !isLoading ? (
               <div className="p-6">
                 <EmptyState
                   icon={Car}
@@ -86,7 +135,7 @@ export default function AdminListingsPage() {
                             </TableCell>
                           </TableRow>
                         ))
-                      : cars.map((car) => (
+                      : filteredCars.map((car) => (
                           <TableRow key={car.id}>
                             <TableCell>
                               <p className="font-medium">
@@ -110,17 +159,52 @@ export default function AdminListingsPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
-                                <Button size="sm" variant="outline">
-                                  <CheckCircle className="mr-1 h-3 w-3" />
-                                  {t("keep")}
-                                </Button>
-                                <Button size="sm" variant="destructive">
+                                {/* Flagged/Warned: Approve to restore */}
+                                {(activeTab === "flagged" || car.status === "WARNED" || car.status === "EXPIRED") && car.status !== "ACTIVE" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                    onClick={() => handleModerate(car.id, "APPROVE")}
+                                    disabled={moderateListing.isPending}
+                                  >
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    {t("keep")}
+                                  </Button>
+                                )}
+                                {/* Toggle Warn / Revoke Warn */}
+                                {car.status === "WARNED" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                    onClick={() => handleModerate(car.id, "REVOKE_WARN")}
+                                    disabled={moderateListing.isPending}
+                                  >
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    Revoke Warn
+                                  </Button>
+                                ) : car.status === "ACTIVE" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                                    onClick={() => handleModerate(car.id, "WARN")}
+                                    disabled={moderateListing.isPending}
+                                  >
+                                    <AlertOctagon className="mr-1 h-3 w-3" />
+                                    {t("warnDealer")}
+                                  </Button>
+                                ) : null}
+                                {/* Remove always available */}
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleModerate(car.id, "REMOVE")}
+                                  disabled={moderateListing.isPending}
+                                >
                                   <Trash2 className="mr-1 h-3 w-3" />
                                   {t("remove")}
-                                </Button>
-                                <Button size="sm" variant="outline">
-                                  <AlertOctagon className="mr-1 h-3 w-3" />
-                                  {t("warnDealer")}
                                 </Button>
                               </div>
                             </TableCell>

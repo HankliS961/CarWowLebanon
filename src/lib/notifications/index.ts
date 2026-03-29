@@ -21,8 +21,13 @@ export {
 
 export {
   generateWhatsAppNotification,
+  generateWhatsAppDeepLink,
   whatsappNewBid,
   whatsappBidAccepted,
   whatsappNewInquiry,
   whatsappNewOffer,
 } from "./whatsapp";
+
+export type { WhatsAppResult } from "./whatsapp";
+
+export { getNotificationHref } from "./href";

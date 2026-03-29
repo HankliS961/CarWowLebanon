@@ -4,6 +4,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { Link, usePathname } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
 import { useAppStore } from "@/store/app-store";
 import {
   Home,
@@ -11,6 +12,7 @@ import {
   DollarSign,
   Heart,
   User,
+  LayoutDashboard,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
 
@@ -38,7 +40,19 @@ export function MobileNav({ className }: MobileNavProps) {
   const t = useTranslations("nav");
   const locale = useLocale() as Locale;
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === "authenticated" && !!session?.user;
   const savedCount = useAppStore((s) => s.savedCarIds.length);
+
+  // Swap last nav item based on login state
+  const navItems = NAV_ITEMS.map((item) => {
+    if (item.labelKey === "account") {
+      return isLoggedIn
+        ? { ...item, href: "/dashboard", labelKey: "account", icon: LayoutDashboard }
+        : { ...item, href: "/auth/login", labelKey: "login", icon: User };
+    }
+    return item;
+  });
 
   return (
     <nav
@@ -49,7 +63,7 @@ export function MobileNav({ className }: MobileNavProps) {
       aria-label="Mobile navigation"
     >
       <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           const label = t(item.labelKey);

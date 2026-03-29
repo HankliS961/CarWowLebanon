@@ -55,6 +55,7 @@ export interface DealerCardData {
 
 /** Search filter state. */
 export interface CarFilters {
+  query?: string;
   make?: string;
   model?: string;
   yearFrom?: number;

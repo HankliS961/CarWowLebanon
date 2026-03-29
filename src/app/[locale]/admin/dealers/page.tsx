@@ -37,8 +37,12 @@ export default function AdminDealersPage() {
   const [activeTab, setActiveTab] = useState<DealerTab>("PENDING");
   const [reviewDealer, setReviewDealer] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [suspendDealer, setSuspendDealer] = useState<string | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
 
-  const { data: dealers, isLoading } = trpc.dealers.list.useQuery(
+  const utils = trpc.useUtils();
+
+  const { data: dealersData, isLoading } = trpc.admin.listAllDealers.useQuery(
     { page: 1, limit: 50 },
     { retry: false }
   );
@@ -46,6 +50,7 @@ export default function AdminDealersPage() {
   const verifyDealer = trpc.admin.verifyDealer.useMutation({
     onSuccess: () => {
       toast.success(t("approveSuccess"));
+      utils.admin.listAllDealers.invalidate();
       setReviewDealer(null);
     },
     onError: (error) => {
@@ -53,10 +58,53 @@ export default function AdminDealersPage() {
     },
   });
 
-  const dealerList = dealers?.dealers ?? [];
+  const rejectDealerMutation = trpc.admin.rejectDealer.useMutation({
+    onSuccess: () => {
+      toast.success(t("rejectSuccess"));
+      utils.admin.listAllDealers.invalidate();
+      setReviewDealer(null);
+      setRejectReason("");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const suspendDealerMutation = trpc.admin.suspendDealer.useMutation({
+    onSuccess: () => {
+      toast.success("Dealer suspended successfully");
+      utils.admin.listAllDealers.invalidate();
+      setSuspendDealer(null);
+      setSuspendReason("");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const allDealers = dealersData?.dealers ?? [];
+
+  // Filter dealers by tab status
+  const dealerList = allDealers.filter((dealer) => dealer.status === activeTab);
 
   const handleApprove = (dealerId: string) => {
     verifyDealer.mutate({ dealerId });
+  };
+
+  const handleReject = () => {
+    if (!reviewDealer || !rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    rejectDealerMutation.mutate({ dealerId: reviewDealer, reason: rejectReason });
+  };
+
+  const handleSuspend = () => {
+    if (!suspendDealer || !suspendReason.trim()) {
+      toast.error("Please provide a reason for suspension");
+      return;
+    }
+    suspendDealerMutation.mutate({ dealerId: suspendDealer, reason: suspendReason });
   };
 
   return (
@@ -146,7 +194,12 @@ export default function AdminDealersPage() {
                                 </>
                               )}
                               {activeTab === "ACTIVE" && (
-                                <Button size="sm" variant="outline">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSuspendDealer(dealer.id)}
+                                  disabled={suspendDealerMutation.isPending}
+                                >
                                   <Ban className="mr-1 h-3 w-3" />
                                   {t("suspend")}
                                 </Button>
@@ -155,6 +208,7 @@ export default function AdminDealersPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleApprove(dealer.id)}
+                                  disabled={verifyDealer.isPending}
                                 >
                                   <CheckCircle className="mr-1 h-3 w-3" />
                                   Reactivate
@@ -189,13 +243,37 @@ export default function AdminDealersPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                toast.success(t("rejectSuccess"));
-                setReviewDealer(null);
-                setRejectReason("");
-              }}
+              onClick={handleReject}
+              disabled={rejectDealerMutation.isPending || !rejectReason.trim()}
             >
-              {t("reject")}
+              {rejectDealerMutation.isPending ? "Rejecting..." : t("reject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend dialog */}
+      <Dialog open={!!suspendDealer} onOpenChange={(open) => !open && setSuspendDealer(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspend Dealer</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={suspendReason}
+            onChange={(e) => setSuspendReason(e.target.value)}
+            placeholder="Reason for suspension..."
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuspendDealer(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSuspend}
+              disabled={suspendDealerMutation.isPending || !suspendReason.trim()}
+            >
+              {suspendDealerMutation.isPending ? "Suspending..." : "Suspend"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -34,10 +34,12 @@ type InquiryTab = "all" | "NEW" | "VIEWED" | "RESPONDED" | "CONVERTED" | "CLOSED
 /** Dealer inquiry inbox with filtering, status management, and reply functionality. */
 export default function DealerInquiriesPage() {
   const t = useTranslations("dealer.inquiries");
+  const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<InquiryTab>("all");
   const [page, setPage] = useState(1);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [viewInquiry, setViewInquiry] = useState<any>(null);
 
   const statusFilter = activeTab === "all" ? undefined : activeTab;
 
@@ -48,12 +50,38 @@ export default function DealerInquiriesPage() {
 
   const inquiryList = inquiries ?? [];
 
+  const markViewedMutation = trpc.inquiries.markViewed.useMutation({
+    onSuccess: () => {
+      toast.success("Inquiry marked as viewed");
+      utils.inquiries.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to mark inquiry as viewed");
+    },
+  });
+
+  const respondMutation = trpc.inquiries.respond.useMutation({
+    onSuccess: () => {
+      toast.success("Response sent successfully");
+      utils.inquiries.invalidate();
+      setReplyTo(null);
+      setReplyText("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to send response");
+    },
+  });
+
+  const handleMarkViewed = (inquiryId: string) => {
+    markViewedMutation.mutate({ inquiryId });
+  };
+
   const handleSendResponse = () => {
-    if (!replyText.trim()) return;
-    // TODO: Call respond mutation
-    toast.success("Response sent");
-    setReplyTo(null);
-    setReplyText("");
+    if (!replyText.trim() || !replyTo) return;
+    respondMutation.mutate({
+      inquiryId: replyTo,
+      response: replyText,
+    });
   };
 
   return (
@@ -109,7 +137,11 @@ export default function DealerInquiriesPage() {
                           </TableRow>
                         ))
                       : inquiryList.map((inquiry) => (
-                          <TableRow key={inquiry.id}>
+                          <TableRow
+                            key={inquiry.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setViewInquiry(inquiry)}
+                          >
                             <TableCell>
                               <p className="font-medium">
                                 {inquiry.buyer.name || "Anonymous"}
@@ -134,10 +166,15 @@ export default function DealerInquiriesPage() {
                             <TableCell>
                               <StatusBadge status={inquiry.status} />
                             </TableCell>
-                            <TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-1">
                                 {inquiry.status === "NEW" && (
-                                  <Button size="sm" variant="outline">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleMarkViewed(inquiry.id)}
+                                    disabled={markViewedMutation.isPending}
+                                  >
                                     {t("markViewed")}
                                   </Button>
                                 )}
@@ -155,7 +192,7 @@ export default function DealerInquiriesPage() {
                 </Table>
                 <DataTablePagination
                   currentPage={page}
-                  totalPages={1}
+                  totalPages={Math.max(1, Math.ceil(inquiryList.length / 20))}
                   onPageChange={setPage}
                   totalItems={inquiryList.length}
                 />
@@ -164,6 +201,76 @@ export default function DealerInquiriesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* View inquiry detail dialog */}
+      <Dialog open={!!viewInquiry} onOpenChange={(open) => !open && setViewInquiry(null)}>
+        <DialogContent className="max-w-lg">
+          {viewInquiry && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {viewInquiry.car.year} {viewInquiry.car.make} {viewInquiry.car.model}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {/* Buyer info */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{viewInquiry.buyer.name || "Anonymous"}</p>
+                    <p className="text-xs text-muted-foreground">{viewInquiry.buyer.email}</p>
+                  </div>
+                  <StatusBadge status={viewInquiry.status} />
+                </div>
+
+                <hr />
+
+                {/* Full message */}
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Buyer Message</p>
+                  <div className="mt-1 rounded-md bg-muted/50 p-3">
+                    <p className="whitespace-pre-wrap text-sm">
+                      {viewInquiry.message || "No message provided"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Contact preference */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Preferred contact: <strong>{viewInquiry.preferredContact}</strong></span>
+                  <span>{new Date(viewInquiry.createdAt).toLocaleString()}</span>
+                </div>
+
+                {/* Quick actions */}
+                <div className="flex gap-2 pt-2">
+                  {viewInquiry.status === "NEW" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        handleMarkViewed(viewInquiry.id);
+                        setViewInquiry(null);
+                      }}
+                      disabled={markViewedMutation.isPending}
+                    >
+                      {t("markViewed")}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setReplyTo(viewInquiry.id);
+                      setViewInquiry(null);
+                    }}
+                  >
+                    <Send className="me-2 h-4 w-4" />
+                    {t("respond")}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Reply dialog */}
       <Dialog open={!!replyTo} onOpenChange={(open) => !open && setReplyTo(null)}>
@@ -181,9 +288,12 @@ export default function DealerInquiriesPage() {
             <Button variant="outline" onClick={() => setReplyTo(null)}>
               Cancel
             </Button>
-            <Button onClick={handleSendResponse} disabled={!replyText.trim()}>
+            <Button
+              onClick={handleSendResponse}
+              disabled={!replyText.trim() || respondMutation.isPending}
+            >
               <Send className="mr-2 h-4 w-4" />
-              {t("sendResponse")}
+              {respondMutation.isPending ? "Sending..." : t("sendResponse")}
             </Button>
           </DialogFooter>
         </DialogContent>

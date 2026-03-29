@@ -4,22 +4,23 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().min(1, "Email or phone is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 /**
- * Email/Password credentials provider for CarSouk.
+ * Email/Password/Phone credentials provider for CarSouk.
  * Validates against bcrypt-hashed passwords stored in the database.
+ * Supports login with either email or phone number.
  */
 export const credentialsProvider = Credentials({
   id: "credentials",
-  name: "Email & Password",
+  name: "Email/Phone & Password",
   credentials: {
     email: {
-      label: "Email",
-      type: "email",
-      placeholder: "you@example.com",
+      label: "Email or Phone",
+      type: "text",
+      placeholder: "you@example.com or +961...",
     },
     password: {
       label: "Password",
@@ -33,10 +34,14 @@ export const credentialsProvider = Credentials({
       throw new Error("Invalid credentials format");
     }
 
-    const { email, password } = parsed.data;
+    const { email: input, password } = parsed.data;
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    // Determine if input is phone or email
+    const isPhone = input.startsWith("+") || /^\d{8,}$/.test(input);
+    const user = await prisma.user.findFirst({
+      where: isPhone
+        ? { phone: input }
+        : { email: input.toLowerCase() },
       select: {
         id: true,
         email: true,

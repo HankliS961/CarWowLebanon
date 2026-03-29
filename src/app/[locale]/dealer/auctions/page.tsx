@@ -33,9 +33,13 @@ export default function DealerAuctionsPage() {
     { retry: false }
   );
 
+  const utils = trpc.useUtils();
+
   const createBid = trpc.sellBids.create.useMutation({
     onSuccess: () => {
       toast.success(t("bidSuccess"));
+      utils.sellListings.listActive.invalidate();
+      utils.sellBids.invalidate();
       setBidListingId(null);
       setBidAmount("");
       setBidNotes("");
@@ -99,7 +103,7 @@ export default function DealerAuctionsPage() {
                   <CardContent className="space-y-2 pb-3">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground">Mileage:</span>
-                      <span>{listing.mileageKm.toLocaleString()} km</span>
+                      <span>{(listing.mileageKm ?? 0).toLocaleString()} km</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />

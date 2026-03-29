@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
-import { SlidersHorizontal, ArrowUpDown, SearchX } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, SearchX, Search } from "lucide-react";
 import type { CarFilters } from "@/types";
 import type { Locale } from "@/i18n/config";
 
@@ -45,6 +45,7 @@ export function CarsSearchClient({ defaultFilters, title }: CarsSearchClientProp
   // Parse initial filters from URL
   const getInitialFilters = (): CarFilters => {
     const fromUrl: CarFilters = {
+      query: searchParams.get("q") || undefined,
       make: searchParams.get("make") || undefined,
       model: searchParams.get("model") || undefined,
       condition: searchParams.get("condition") || undefined,
@@ -72,6 +73,7 @@ export function CarsSearchClient({ defaultFilters, title }: CarsSearchClientProp
   // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams();
+    if (debouncedFilters.query) params.set("q", debouncedFilters.query);
     if (debouncedFilters.make) params.set("make", debouncedFilters.make);
     if (debouncedFilters.model) params.set("model", debouncedFilters.model);
     if (debouncedFilters.condition && !defaultFilters?.condition) params.set("condition", debouncedFilters.condition);
@@ -90,8 +92,9 @@ export function CarsSearchClient({ defaultFilters, title }: CarsSearchClientProp
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [debouncedFilters, sort, pathname, router, defaultFilters]);
 
-  // tRPC query
-  const { data, isLoading, isFetching } = trpc.cars.list.useQuery({
+  // tRPC query — uses Meilisearch when available, falls back to Prisma
+  const { data, isLoading, isFetching } = trpc.cars.search.useQuery({
+    query: debouncedFilters.query,
     make: debouncedFilters.make,
     model: debouncedFilters.model,
     condition: debouncedFilters.condition as "NEW" | "USED" | "CERTIFIED_PREOWNED" | undefined,
@@ -100,10 +103,10 @@ export function CarsSearchClient({ defaultFilters, title }: CarsSearchClientProp
     transmission: debouncedFilters.transmission as "AUTOMATIC" | "MANUAL" | "CVT" | undefined,
     region: debouncedFilters.region as "BEIRUT" | "MOUNT_LEBANON" | "NORTH" | "SOUTH" | "BEKAA" | "NABATIEH" | undefined,
     source: debouncedFilters.source as "LOCAL" | "IMPORTED_USA" | "IMPORTED_GULF" | "IMPORTED_EUROPE" | "SALVAGE_REBUILT" | undefined,
-    priceFrom: debouncedFilters.priceFrom,
-    priceTo: debouncedFilters.priceTo,
-    yearFrom: debouncedFilters.yearFrom,
-    yearTo: debouncedFilters.yearTo,
+    priceMin: debouncedFilters.priceFrom,
+    priceMax: debouncedFilters.priceTo,
+    yearMin: debouncedFilters.yearFrom,
+    yearMax: debouncedFilters.yearTo,
     sort: sort as "newest" | "oldest" | "priceLow" | "priceHigh" | "mileageLow" | "yearNew",
     page,
     limit: 20,
@@ -121,9 +124,22 @@ export function CarsSearchClient({ defaultFilters, title }: CarsSearchClientProp
       {/* Page header */}
       <div className="border-b bg-muted/30 px-4 py-6">
         <div className="container mx-auto max-w-7xl">
-          <h1 className="text-2xl font-bold text-charcoal sm:text-3xl">
+          <h1 className="mb-4 text-2xl font-bold text-charcoal sm:text-3xl">
             {pageTitle}
           </h1>
+          {/* Full-text search input */}
+          <div className="relative max-w-lg">
+            <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              placeholder={t("searchPlaceholder")}
+              value={filters.query ?? ""}
+              onChange={(e) =>
+                handleFiltersChange({ ...filters, query: e.target.value || undefined })
+              }
+              className="h-10 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1"
+            />
+          </div>
         </div>
       </div>
 

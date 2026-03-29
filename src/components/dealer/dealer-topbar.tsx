@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { signOut } from "next-auth/react";
+import { trpc } from "@/lib/trpc/client";
 
 interface DealerTopbarProps {
   onMenuClick: () => void;
@@ -23,6 +25,13 @@ export function DealerTopbar({
   dealerName = "Dealer",
   logoUrl,
 }: DealerTopbarProps) {
+  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(undefined, {
+    refetchInterval: 30000,
+    retry: false,
+  });
+
+  const count = unreadCount ?? 0;
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-4 lg:px-6">
       {/* Left side: menu toggle + page context */}
@@ -52,9 +61,11 @@ export function DealerTopbar({
         {/* Notification bell */}
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell className="h-5 w-5" />
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-            3
-          </span>
+          {count > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              {count > 99 ? "99+" : count}
+            </span>
+          )}
         </Button>
 
         {/* Profile dropdown */}
@@ -70,7 +81,10 @@ export function DealerTopbar({
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>

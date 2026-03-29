@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, dealerProcedure } from "../trpc";
+import { notifyNewOffer } from "@/lib/notifications/create";
+import { sendNewOfferEmail } from "@/lib/notifications/email";
 
 /** Offers router — dealer offers on buyer configurations. */
 export const offersRouter = createTRPCRouter({
@@ -16,14 +19,40 @@ export const offersRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const dealer = await ctx.prisma.dealer.findUnique({ where: { userId: ctx.session.user.id } });
-      if (!dealer) throw new Error("Dealer profile not found");
+      if (!dealer) throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
 
-      return ctx.prisma.dealerOffer.create({
+      const offer = await ctx.prisma.dealerOffer.create({
         data: {
           ...input,
           dealerId: dealer.id,
         },
       });
+
+      // Fire-and-forget: notify buyer of new offer
+      const config = await ctx.prisma.carConfiguration.findUnique({
+        where: { id: input.configurationId },
+        include: { buyer: true },
+      });
+
+      if (config) {
+        notifyNewOffer({
+          buyerId: config.buyerId,
+          dealerName: dealer.companyName,
+          priceOffered: input.priceOfferedUsd,
+          configurationId: input.configurationId,
+        }).catch(console.error);
+
+        if (config.buyer.email) {
+          sendNewOfferEmail(
+            config.buyer.email,
+            dealer.companyName,
+            input.priceOfferedUsd,
+            input.configurationId,
+          ).catch(console.error);
+        }
+      }
+
+      return offer;
     }),
 
   /** Accept an offer (buyer only). */
@@ -36,7 +65,7 @@ export const offersRouter = createTRPCRouter({
       });
 
       if (!offer || offer.configuration.buyerId !== ctx.session.user.id) {
-        throw new Error("Offer not found or unauthorized");
+        throw new TRPCError({ code: "FORBIDDEN", message: "Offer not found or unauthorized" });
       }
 
       // Accept this offer, reject others

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure, protectedProcedure, dealerProcedure } from "../trpc";
 
 /** Dealers router — dealer profiles and directory. */
@@ -99,28 +100,53 @@ export const dealersRouter = createTRPCRouter({
       });
     }),
 
+  /** Get the currently logged-in dealer's own profile. */
+  getMyProfile: dealerProcedure
+    .query(async ({ ctx }) => {
+      const dealer = await ctx.prisma.dealer.findUnique({
+        where: { userId: ctx.session.user.id },
+        include: {
+          _count: { select: { cars: { where: { status: "ACTIVE" } } } },
+        },
+      });
+
+      if (!dealer) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
+      }
+
+      return dealer;
+    }),
+
   /** Update dealer profile (dealer only). */
   updateProfile: dealerProcedure
     .input(
       z.object({
+        companyName: z.string().min(2).optional(),
+        companyNameAr: z.string().min(2).optional(),
         descriptionEn: z.string().optional(),
         descriptionAr: z.string().optional(),
+        address: z.string().optional(),
+        region: z.enum(["BEIRUT", "MOUNT_LEBANON", "NORTH", "SOUTH", "BEKAA", "NABATIEH"]).optional(),
+        city: z.string().min(1).optional(),
+        phone: z.string().min(8).optional(),
+        email: z.string().email().optional(),
         whatsappNumber: z.string().optional(),
-        websiteUrl: z.string().url().optional(),
+        websiteUrl: z.string().optional(),
         instagramUrl: z.string().optional(),
         workingHours: z.any().optional(),
+        logoUrl: z.string().optional(),
+        coverImageUrl: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const { workingHours, logoUrl, coverImageUrl, ...rest } = input;
       return ctx.prisma.dealer.update({
         where: { userId: ctx.session.user.id },
         data: {
-          descriptionEn: input.descriptionEn,
-          descriptionAr: input.descriptionAr,
-          whatsappNumber: input.whatsappNumber,
-          websiteUrl: input.websiteUrl,
-          instagramUrl: input.instagramUrl,
-          ...(input.workingHours !== undefined && { workingHours: input.workingHours }),
+          ...rest,
+          ...(workingHours !== undefined && { workingHours }),
+          ...(logoUrl !== undefined && { logoUrl }),
+          ...(coverImageUrl !== undefined && { coverImageUrl }),
         },
       });
     }),

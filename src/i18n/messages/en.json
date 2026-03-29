@@ -138,6 +138,7 @@
   "cars": {
     "title": "Cars for Sale in Lebanon",
     "searchTitle": "Search Cars",
+    "searchPlaceholder": "Search by make, model, or keyword...",
     "filters": {
       "make": "Make",
       "model": "Model",
@@ -480,8 +481,8 @@
     "login": {
       "title": "Sign In",
       "subtitle": "Welcome back to CarSouk",
-      "emailLabel": "Email",
-      "emailPlaceholder": "you@example.com",
+      "emailLabel": "Email or Phone Number",
+      "emailPlaceholder": "you@example.com or +961...",
       "passwordLabel": "Password",
       "passwordPlaceholder": "Enter your password",
       "submit": "Sign In",
@@ -491,6 +492,28 @@
       "orContinueWith": "Or continue with",
       "google": "Continue with Google",
       "phone": "Continue with Phone"
+    },
+    "forgotPassword": {
+      "title": "Reset Password",
+      "phoneStep": "Enter your phone number",
+      "phoneStepSubtitle": "We'll send a reset code to your WhatsApp",
+      "sendCode": "Send Reset Code",
+      "otpStep": "Enter reset code",
+      "otpStepSubtitle": "We sent a 6-digit code to your WhatsApp",
+      "verify": "Verify Code",
+      "newPasswordStep": "Set new password",
+      "newPasswordStepSubtitle": "Choose a strong password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm Password",
+      "resetPassword": "Reset Password",
+      "success": "Password reset successfully! You can now log in.",
+      "backToLogin": "Back to Login",
+      "resendCode": "Resend code",
+      "resendIn": "Resend in {seconds}s",
+      "noAccount": "No account with this number?",
+      "signUp": "Sign up",
+      "step": "Step {current} of {total}",
+      "back": "Back"
     },
     "register": {
       "title": "Create Account",
@@ -510,7 +533,21 @@
       "signIn": "Sign in",
       "terms": "By signing up, you agree to our",
       "termsLink": "Terms of Service",
-      "privacyLink": "Privacy Policy"
+      "privacyLink": "Privacy Policy",
+      "phoneStep": "Enter your phone number",
+      "phoneStepSubtitle": "We'll send a verification code to your WhatsApp",
+      "sendCode": "Send WhatsApp Code",
+      "otpStep": "Enter verification code",
+      "otpStepSubtitle": "We sent a 6-digit code to your WhatsApp",
+      "verify": "Verify",
+      "resendCode": "Resend code",
+      "resendIn": "Resend in {seconds}s",
+      "didntReceive": "Didn't receive the code? Make sure WhatsApp is active on this number",
+      "phoneVerified": "Phone verified",
+      "completeStep": "Complete your account",
+      "completeStepSubtitle": "Just a few more details",
+      "back": "Back",
+      "step": "Step {current} of {total}"
     },
     "otp": {
       "title": "Verify Phone Number",
@@ -601,7 +638,9 @@
       "confirmAcceptDesc": "This will mark the listing as sold. Other bids will be rejected.",
       "confirmCancel": "Are you sure you want to cancel this listing?",
       "confirmCancelDesc": "Active bids will be rejected and the listing will be removed.",
+      "statusDraft": "Draft",
       "statusPending": "Pending Review",
+      "statusPendingReview": "Pending Review",
       "statusLive": "Live",
       "statusSold": "Sold",
       "statusExpired": "Expired",
@@ -746,7 +785,7 @@
     "team": { "title": "Team Management", "inviteMember": "Invite Member", "email": "Email Address", "role": "Role", "salesRep": "Sales Representative", "remove": "Remove", "invite": "Send Invite", "inviteSuccess": "Invitation sent", "empty": "No team members yet", "emptyDescription": "Invite team members to help manage your dealership" }
   },
   "admin": {
-    "nav": { "dashboard": "Dashboard", "users": "Users", "dealers": "Dealers", "listings": "Listings", "content": "Content", "featured": "Featured", "settings": "Settings", "analytics": "Analytics", "logs": "Audit Log" },
+    "nav": { "dashboard": "Dashboard", "users": "Users", "dealers": "Dealers", "listings": "Listings", "content": "Content", "featured": "Featured", "siteImages": "Site Images", "settings": "Settings", "analytics": "Analytics", "logs": "Audit Log" },
     "dashboard": { "title": "Admin Dashboard", "totalUsers": "Total Users", "newThisWeek": "New This Week", "totalDealers": "Total Dealers", "pendingApproval": "Pending Approval", "totalListings": "Total Listings", "activeListings": "Active", "totalInquiries": "Total Inquiries", "thisWeek": "This Week", "pendingActions": "Pending Actions", "dealerApplications": "Dealer Applications", "flaggedListings": "Flagged Listings", "pendingReviews": "Pending Reviews", "recentActivity": "Recent Activity" },
     "users": { "title": "User Management", "search": "Search by name, email, or phone...", "suspend": "Suspend", "activate": "Activate" },
     "dealers": { "title": "Dealer Management", "tabs": { "pending": "Pending", "active": "Active", "suspended": "Suspended" }, "approve": "Approve", "reject": "Reject", "suspend": "Suspend", "rejectReason": "Reason for rejection", "approveSuccess": "Dealer approved", "rejectSuccess": "Dealer rejected" },

@@ -84,6 +84,7 @@ enum Drivetrain {
 enum ListingStatus {
   DRAFT
   ACTIVE
+  WARNED
   SOLD
   EXPIRED
 }
@@ -125,6 +126,7 @@ enum FinancePreference {
 }
 
 enum SellListingStatus {
+  DRAFT
   PENDING_REVIEW
   LIVE
   SOLD
@@ -401,6 +403,7 @@ model Inquiry {
   buyerId          String
   dealerId         String
   message          String?       @db.Text
+  dealerResponse   String?       @db.Text
   preferredContact ContactMethod
   status           InquiryStatus @default(NEW)
   createdAt        DateTime      @default(now())
@@ -480,22 +483,24 @@ model DealerOffer {
 model SellListing {
   id                     String            @id @default(uuid())
   sellerId               String
-  make                   String
-  model                  String
-  year                   Int
+  make                   String?
+  model                  String?
+  year                   Int?
   trim                   String?
-  mileageKm              Int
+  mileageKm              Int?
   conditionDescription   String?           @db.Text
   conditionCheckboxes    Json?
-  source                 CarSource
+  source                 CarSource?
   accidentHistory        Boolean?
   askingPriceUsd         Decimal?          @db.Decimal(12, 2)
   estimatedValueMinUsd   Decimal?          @db.Decimal(12, 2)
   estimatedValueMaxUsd   Decimal?          @db.Decimal(12, 2)
   images                 Json              @default("[]")
-  status                 SellListingStatus @default(PENDING_REVIEW)
+  status                 SellListingStatus @default(DRAFT)
+  currentStep            Int               @default(1)
   auctionEndsAt          DateTime?
   createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   seller User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   bids   SellBid[]
@@ -724,6 +729,25 @@ model CarModel {
   @@index([makeId])
   @@index([slug])
   @@map("car_models")
+}
+
+// ============================================================================
+// SITE IMAGES — Managed static images (make logos, body type images, etc.)
+// ============================================================================
+
+model SiteImage {
+  id        String   @id @default(uuid())
+  category  String   // "body_type", "hero", "banner", etc.
+  key       String   // "SUV", "SEDAN", "hero_bg", etc.
+  imageUrl  String
+  label     String?  // optional display label
+  sortOrder Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([category, key])
+  @@index([category])
+  @@map("site_images")
 }
 
 // ============================================================================

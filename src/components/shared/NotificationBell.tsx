@@ -6,8 +6,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { Bell, Check, MessageSquare, DollarSign, Tag, Star, Search, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
-import { Link } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import type { Locale } from "@/i18n/config";
+import { getNotificationHref } from "@/lib/notifications/href";
 
 const NOTIFICATION_ICONS: Record<string, typeof Bell> = {
   NEW_BID: DollarSign,
@@ -34,7 +35,7 @@ function timeAgo(date: Date, locale: string): string {
 export function NotificationBell() {
   const locale = useLocale() as Locale;
   const t = useTranslations("notifications");
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -79,11 +80,21 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  const handleNotificationClick = (id: string, isRead: boolean) => {
+  const router = useRouter();
+
+  const userRole = (session?.user as any)?.role as string | undefined;
+
+  const handleNotificationClick = (
+    id: string,
+    isRead: boolean,
+    type: string,
+    data?: Record<string, unknown> | null,
+  ) => {
     if (!isRead) {
       markReadMutation.mutate({ id });
     }
     setIsOpen(false);
+    router.push(getNotificationHref(type, data, userRole));
   };
 
   const count = unreadCount ?? 0;
@@ -142,10 +153,17 @@ export function NotificationBell() {
                     key={notif.id}
                     type="button"
                     className={cn(
-                      "flex w-full gap-3 px-4 py-3 text-start transition-colors hover:bg-muted/50",
+                      "flex w-full cursor-pointer gap-3 px-4 py-3 text-start transition-colors hover:bg-muted/50",
                       !notif.isRead && "bg-teal-50/50"
                     )}
-                    onClick={() => handleNotificationClick(notif.id, notif.isRead)}
+                    onClick={() =>
+                      handleNotificationClick(
+                        notif.id,
+                        notif.isRead,
+                        notif.type,
+                        notif.data as Record<string, unknown> | null,
+                      )
+                    }
                   >
                     <div
                       className={cn(

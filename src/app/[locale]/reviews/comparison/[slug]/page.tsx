@@ -30,11 +30,11 @@ export default async function ComparisonPage({ params }: ComparisonPageProps) {
 
   const cars: { make: string; model: string; year: number; imageUrl: string; rating: number; priceUsd: number; specs: Record<string, string> }[] = [
     {
-      make: "Toyota", model: "RAV4", year: 2026, imageUrl: "/images/car-placeholder.webp", rating: 8.5, priceUsd: 32000,
+      make: "Toyota", model: "RAV4", year: 2026, imageUrl: "/images/car-placeholder.svg", rating: 8.5, priceUsd: 32000,
       specs: { Engine: "2.5L 4-Cylinder", Horsepower: "203 hp", Torque: "184 lb-ft", Transmission: "8-Speed Auto", "Fuel Economy": "7.1 L/100km", Drivetrain: "FWD / AWD", "Boot Space": "580 L", "0-100 km/h": "8.4 sec" },
     },
     {
-      make: "Kia", model: "Sportage", year: 2026, imageUrl: "/images/car-placeholder.webp", rating: 8.3, priceUsd: 30000,
+      make: "Kia", model: "Sportage", year: 2026, imageUrl: "/images/car-placeholder.svg", rating: 8.3, priceUsd: 30000,
       specs: { Engine: "1.6L Turbo", Horsepower: "180 hp", Torque: "195 lb-ft", Transmission: "7-Speed DCT", "Fuel Economy": "7.5 L/100km", Drivetrain: "FWD / AWD", "Boot Space": "543 L", "0-100 km/h": "9.1 sec" },
     },
   ];

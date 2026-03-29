@@ -28,6 +28,17 @@ export default function DealerDashboardPage() {
   const locale = (params.locale as string) || "en";
   const t = useTranslations("dealer.dashboard");
 
+  // Fetch dealer profile for rating and active listing count
+  const { data: dealer } = trpc.dealers.getMyProfile.useQuery(undefined, {
+    retry: false,
+  });
+
+  // Fetch dealer's car listings for views count
+  const { data: listingsData } = trpc.cars.listForDealer.useQuery(
+    { page: 1, limit: 50 },
+    { retry: false }
+  );
+
   // Fetch dealer's inquiries for the recent list
   const { data: inquiries } = trpc.inquiries.listForDealer.useQuery(
     { page: 1, limit: 5 },
@@ -40,6 +51,11 @@ export default function DealerDashboardPage() {
     { retry: false }
   );
 
+  // Calculate KPI values from available data
+  const activeListingsCount = dealer?._count?.cars ?? 0;
+  const totalViews = listingsData?.cars?.reduce((sum, car) => sum + (car.viewsCount ?? 0), 0) ?? 0;
+  const dealerRating = dealer?.ratingAvg ? Number(dealer.ratingAvg).toFixed(1) : "N/A";
+
   return (
     <div className="space-y-6">
       <PageHeader title={t("title")} description={t("welcome")} />
@@ -48,28 +64,25 @@ export default function DealerDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title={t("activeListings")}
-          value="--"
+          value={activeListingsCount}
           icon={Car}
           subtitle={t("fromLastWeek")}
-          trend={{ value: 0, label: "" }}
         />
         <MetricCard
           title={t("inquiriesThisWeek")}
-          value={inquiries?.length ?? "--"}
+          value={inquiries?.length ?? 0}
           icon={MessageSquare}
           subtitle={t("fromLastWeek")}
-          trend={{ value: 12, label: "" }}
         />
         <MetricCard
           title={t("viewsThisWeek")}
-          value="--"
+          value={totalViews > 0 ? totalViews.toLocaleString() : "N/A"}
           icon={Eye}
           subtitle={t("fromLastWeek")}
-          trend={{ value: 8, label: "" }}
         />
         <MetricCard
           title={t("dealerRating")}
-          value="--"
+          value={dealerRating}
           icon={Star}
         />
       </div>

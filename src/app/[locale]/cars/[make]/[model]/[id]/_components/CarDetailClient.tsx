@@ -12,6 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatPriceUsd, formatMileage } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useSession } from "next-auth/react";
+import { useRouter } from "@/i18n/routing";
+import { trpc } from "@/lib/trpc/client";
+import { SaveCarButton } from "@/components/cars/SaveCarButton";
 import {
   ChevronLeft,
   ChevronRight,
@@ -21,6 +25,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Flag,
+  Heart,
   Share2,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
@@ -85,6 +90,33 @@ export function CarDetailClient({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  // Save / favorite functionality
+  const { data: session } = useSession();
+  const router = useRouter();
+  const utils = trpc.useUtils();
+
+  const { data: savedStatus } = trpc.savedCars.isSaved.useQuery(
+    { carId: car.id },
+    { enabled: !!session },
+  );
+
+  const toggleSave = trpc.savedCars.toggle.useMutation({
+    onSuccess: () => {
+      utils.savedCars.isSaved.invalidate({ carId: car.id });
+      utils.savedCars.list.invalidate();
+    },
+  });
+
+  const isSaved = savedStatus?.saved ?? false;
+
+  const handleSave = () => {
+    if (!session) {
+      router.push("/auth/login");
+      return;
+    }
+    toggleSave.mutate({ carId: car.id });
+  };
+
   const images = (car.images as string[] | null) || [];
   const allImages = images.length > 0 ? images : car.thumbnailUrl ? [car.thumbnailUrl] : [];
   const price = car.priceUsd as unknown as number;
@@ -143,6 +175,9 @@ export function CarDetailClient({
                     <Badge variant="secondary">{tc("negotiable")}</Badge>
                   )}
                 </div>
+
+                {/* Save button overlay */}
+                <SaveCarButton carId={car.id} variant="overlay" className="z-10" />
 
                 {/* Image counter */}
                 {allImages.length > 1 && (
@@ -359,6 +394,8 @@ export function CarDetailClient({
                   phone: car.dealer.phone ?? undefined,
                   slug: car.dealer.slug,
                 }}
+                onSave={handleSave}
+                isSaved={isSaved}
               />
             </div>
           )}
@@ -420,6 +457,20 @@ export function CarDetailClient({
                 {formatPriceUsd(price)}
               </span>
             </div>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleSave}
+              disabled={toggleSave.isPending}
+              aria-label={isSaved ? "Unsave car" : "Save car"}
+            >
+              <Heart
+                className={cn(
+                  "h-4 w-4",
+                  isSaved ? "fill-red-500 text-red-500" : "",
+                )}
+              />
+            </Button>
             {car.dealer.whatsappNumber && (
               <WhatsAppButton
                 phoneNumber={car.dealer.whatsappNumber}

@@ -37,11 +37,6 @@ export function HowItWorksSection() {
                   </span>
                 </div>
 
-                {/* Connector line (hidden on mobile) */}
-                {index < STEPS.length - 1 && (
-                  <div className="absolute hidden h-px w-32 bg-border md:block" />
-                )}
-
                 <h3 className="mb-2 text-lg font-semibold text-charcoal">
                   {t(step.titleKey)}
                 </h3>

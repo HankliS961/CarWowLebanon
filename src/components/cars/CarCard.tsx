@@ -8,7 +8,8 @@ import { PriceDisplay } from "@/components/shared/PriceDisplay";
 import { cn } from "@/lib/utils";
 import { formatMileage } from "@/lib/utils";
 import type { CarCardData } from "@/types";
-import { Fuel, Gauge, Calendar, Settings2, Heart, MapPin, ShieldCheck } from "lucide-react";
+import { Fuel, Gauge, Calendar, Settings2, MapPin, ShieldCheck } from "lucide-react";
+import { SaveCarButton } from "@/components/cars/SaveCarButton";
 import type { Locale } from "@/i18n/config";
 
 export interface CarCardProps {
@@ -39,7 +40,7 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
         {/* Image */}
         <div className="relative h-32 w-36 flex-shrink-0 sm:h-40 sm:w-48">
           <Image
-            src={car.thumbnailUrl || "/images/car-placeholder.webp"}
+            src={car.thumbnailUrl || "/images/car-placeholder.svg"}
             alt={title}
             fill
             className="object-cover transition-transform group-hover:scale-105"
@@ -50,6 +51,7 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
               {tc("featured")}
             </Badge>
           )}
+          <SaveCarButton carId={car.id} variant="overlay" />
         </div>
 
         {/* Content */}
@@ -92,7 +94,7 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
       {/* Image */}
       <div className="relative aspect-[16/10] w-full overflow-hidden">
         <Image
-          src={car.thumbnailUrl || "/images/car-placeholder.webp"}
+          src={car.thumbnailUrl || "/images/car-placeholder.svg"}
           alt={title}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -111,14 +113,7 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
           )}
         </div>
         {/* Save button */}
-        <button
-          type="button"
-          className="absolute end-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-muted-foreground backdrop-blur-sm transition-colors hover:bg-white hover:text-coral"
-          aria-label={t("saveCar")}
-          onClick={(e) => e.preventDefault()}
-        >
-          <Heart className="h-4 w-4" />
-        </button>
+        <SaveCarButton carId={car.id} variant="overlay" />
       </div>
 
       {/* Content */}

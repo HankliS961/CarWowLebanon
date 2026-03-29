@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { FileText, Eye, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -24,9 +26,13 @@ type ContentTab = "blogPosts" | "carReviews" | "guides";
 
 /** Admin content management page for blog posts, car reviews, and guides. */
 export default function AdminContentPage() {
+  const params = useParams();
+  const locale = (params.locale as string) || "en";
   const t = useTranslations("admin.content");
   const [activeTab, setActiveTab] = useState<ContentTab>("blogPosts");
   const [page, setPage] = useState(1);
+
+  const utils = trpc.useUtils();
 
   const { data: blogData, isLoading: blogLoading } = trpc.content.listBlogPosts.useQuery(
     { page, limit: 25 },
@@ -38,7 +44,37 @@ export default function AdminContentPage() {
     { enabled: activeTab === "carReviews", retry: false }
   );
 
+  const publishContent = trpc.admin.publishContent.useMutation({
+    onSuccess: (_data, variables) => {
+      const statusLabel = variables.status === "PUBLISHED" ? "Published" : "Unpublished";
+      toast.success(`Content ${statusLabel.toLowerCase()} successfully`);
+      utils.content.listBlogPosts.invalidate();
+      utils.content.listCarReviews.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   const isLoading = activeTab === "blogPosts" ? blogLoading : reviewLoading;
+
+  const handlePublishBlog = (postId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "DRAFT" ? "PUBLISHED" : "DRAFT";
+    publishContent.mutate({
+      id: postId,
+      type: "BLOG",
+      status: newStatus as "PUBLISHED" | "DRAFT",
+    });
+  };
+
+  const handlePublishReview = (reviewId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "DRAFT" ? "PUBLISHED" : "DRAFT";
+    publishContent.mutate({
+      id: reviewId,
+      type: "REVIEW",
+      status: newStatus as "PUBLISHED" | "DRAFT",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -101,14 +137,23 @@ export default function AdminContentPage() {
                             <TableCell>
                               <div className="flex gap-1">
                                 {post.status === "DRAFT" ? (
-                                  <Button size="sm">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePublishBlog(post.id, post.status)}
+                                    disabled={publishContent.isPending}
+                                  >
                                     <CheckCircle className="mr-1 h-3 w-3" />
-                                    {t("publish")}
+                                    {publishContent.isPending ? "Publishing..." : t("publish")}
                                   </Button>
                                 ) : (
-                                  <Button size="sm" variant="outline">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handlePublishBlog(post.id, post.status)}
+                                    disabled={publishContent.isPending}
+                                  >
                                     <XCircle className="mr-1 h-3 w-3" />
-                                    {t("unpublish")}
+                                    {publishContent.isPending ? "Unpublishing..." : t("unpublish")}
                                   </Button>
                                 )}
                               </div>
@@ -139,43 +184,80 @@ export default function AdminContentPage() {
                 <EmptyState icon={FileText} title="No car reviews found" />
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Make/Model</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reviewLoading
-                    ? Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell colSpan={5}>
-                            <div className="h-10 animate-pulse rounded bg-muted" />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    : (reviewData?.reviews ?? []).map((review) => (
-                        <TableRow key={review.id}>
-                          <TableCell className="font-medium">{review.titleEn}</TableCell>
-                          <TableCell>{review.make} {review.model} {review.year}</TableCell>
-                          <TableCell>{review.author.name || "Unknown"}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={review.status} />
-                          </TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline">
-                              <Eye className="mr-1 h-3 w-3" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                </TableBody>
-              </Table>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Make/Model</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reviewLoading
+                      ? Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell colSpan={5}>
+                              <div className="h-10 animate-pulse rounded bg-muted" />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      : (reviewData?.reviews ?? []).map((review) => (
+                          <TableRow key={review.id}>
+                            <TableCell className="font-medium">{review.titleEn}</TableCell>
+                            <TableCell>{review.make} {review.model} {review.year}</TableCell>
+                            <TableCell>{review.author.name || "Unknown"}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={review.status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => window.open(`/${locale}/reviews/${review.slug}`, "_blank")}
+                                >
+                                  <Eye className="mr-1 h-3 w-3" />
+                                  View
+                                </Button>
+                                {review.status === "DRAFT" ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePublishReview(review.id, review.status)}
+                                    disabled={publishContent.isPending}
+                                  >
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    {t("publish")}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handlePublishReview(review.id, review.status)}
+                                    disabled={publishContent.isPending}
+                                  >
+                                    <XCircle className="mr-1 h-3 w-3" />
+                                    {t("unpublish")}
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                  </TableBody>
+                </Table>
+                {reviewData && (
+                  <DataTablePagination
+                    currentPage={page}
+                    totalPages={reviewData.totalPages}
+                    onPageChange={setPage}
+                    totalItems={reviewData.total}
+                    pageSize={25}
+                  />
+                )}
+              </>
             )}
           </Card>
         </TabsContent>

@@ -69,7 +69,7 @@ export function BlogPostCard({
       {/* Image */}
       <div className="relative aspect-[16/10] w-full overflow-hidden">
         <Image
-          src={featuredImageUrl || "/images/blog-placeholder.webp"}
+          src={featuredImageUrl || "/images/blog-placeholder.svg"}
           alt={title}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"

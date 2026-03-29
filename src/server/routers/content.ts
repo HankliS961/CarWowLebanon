@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
+import { createTRPCRouter, publicProcedure, adminProcedure } from "../trpc";
 import { BLOG_CATEGORIES } from "@/types/content";
 
 /** Content router — blog posts, guides, and editorial content. */
@@ -211,4 +212,173 @@ export const contentRouter = createTRPCRouter({
     });
     return makes.map((m) => m.make);
   }),
+
+  // -----------------------------------------------------------------------
+  // Admin — Blog Post Management
+  // -----------------------------------------------------------------------
+
+  /** Create a new blog post (DRAFT by default). */
+  createBlogPost: adminProcedure
+    .input(
+      z.object({
+        titleEn: z.string(),
+        titleAr: z.string(),
+        contentEn: z.string(),
+        contentAr: z.string(),
+        excerptEn: z.string().optional(),
+        excerptAr: z.string().optional(),
+        category: z.enum([
+          "BUYING_GUIDE",
+          "SELLING_TIPS",
+          "CAR_NEWS",
+          "IMPORT_CUSTOMS",
+          "FINANCE_INSURANCE",
+          "MAINTENANCE",
+          "MARKET_ANALYSIS",
+        ]),
+        tags: z.array(z.string()).default([]),
+        featuredImageUrl: z.string().optional(),
+        seoTitleEn: z.string().optional(),
+        seoTitleAr: z.string().optional(),
+        seoDescriptionEn: z.string().optional(),
+        seoDescriptionAr: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const slug = input.titleEn
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+
+      return ctx.prisma.blogPost.create({
+        data: {
+          slug,
+          titleEn: input.titleEn,
+          titleAr: input.titleAr,
+          contentEn: input.contentEn,
+          contentAr: input.contentAr,
+          excerptEn: input.excerptEn,
+          excerptAr: input.excerptAr,
+          category: input.category,
+          tags: input.tags,
+          featuredImageUrl: input.featuredImageUrl,
+          seoTitleEn: input.seoTitleEn,
+          seoTitleAr: input.seoTitleAr,
+          seoDescriptionEn: input.seoDescriptionEn,
+          seoDescriptionAr: input.seoDescriptionAr,
+          authorId: ctx.session.user.id,
+          status: "DRAFT",
+        },
+      });
+    }),
+
+  /** Update an existing blog post. */
+  updateBlogPost: adminProcedure
+    .input(
+      z.object({
+        postId: z.string(),
+        titleEn: z.string().optional(),
+        titleAr: z.string().optional(),
+        contentEn: z.string().optional(),
+        contentAr: z.string().optional(),
+        excerptEn: z.string().optional(),
+        excerptAr: z.string().optional(),
+        category: z
+          .enum([
+            "BUYING_GUIDE",
+            "SELLING_TIPS",
+            "CAR_NEWS",
+            "IMPORT_CUSTOMS",
+            "FINANCE_INSURANCE",
+            "MAINTENANCE",
+            "MARKET_ANALYSIS",
+          ])
+          .optional(),
+        tags: z.array(z.string()).optional(),
+        featuredImageUrl: z.string().optional(),
+        seoTitleEn: z.string().optional(),
+        seoTitleAr: z.string().optional(),
+        seoDescriptionEn: z.string().optional(),
+        seoDescriptionAr: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.blogPost.findUnique({
+        where: { id: input.postId },
+      });
+
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Blog post not found" });
+      }
+
+      const { postId, ...updates } = input;
+
+      return ctx.prisma.blogPost.update({
+        where: { id: postId },
+        data: updates,
+      });
+    }),
+
+  /** Delete a blog post. */
+  deleteBlogPost: adminProcedure
+    .input(z.object({ postId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.blogPost.findUnique({
+        where: { id: input.postId },
+      });
+
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Blog post not found" });
+      }
+
+      return ctx.prisma.blogPost.delete({
+        where: { id: input.postId },
+      });
+    }),
+
+  /** Publish or unpublish a blog post. */
+  publishBlogPost: adminProcedure
+    .input(z.object({ postId: z.string(), status: z.enum(["PUBLISHED", "DRAFT"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const post = await ctx.prisma.blogPost.findUnique({
+        where: { id: input.postId },
+      });
+
+      if (!post) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Blog post not found" });
+      }
+
+      return ctx.prisma.blogPost.update({
+        where: { id: input.postId },
+        data: {
+          status: input.status,
+          ...(input.status === "PUBLISHED" && !post.publishedAt && { publishedAt: new Date() }),
+        },
+      });
+    }),
+
+  // -----------------------------------------------------------------------
+  // Admin — Car Review Management
+  // -----------------------------------------------------------------------
+
+  /** Publish or unpublish a car review. */
+  publishCarReview: adminProcedure
+    .input(z.object({ reviewId: z.string(), status: z.enum(["PUBLISHED", "DRAFT"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const review = await ctx.prisma.carReview.findUnique({
+        where: { id: input.reviewId },
+      });
+
+      if (!review) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Car review not found" });
+      }
+
+      return ctx.prisma.carReview.update({
+        where: { id: input.reviewId },
+        data: {
+          status: input.status,
+          ...(input.status === "PUBLISHED" && !review.publishedAt && { publishedAt: new Date() }),
+        },
+      });
+    }),
 });

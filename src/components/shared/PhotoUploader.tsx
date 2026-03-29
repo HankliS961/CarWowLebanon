@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { Camera, Upload, X, Check, ImageIcon } from "lucide-react";
+import { Camera, Upload, X, Check, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,7 @@ export const PHOTO_SLOTS: PhotoSlot[] = [
 
 interface PhotoUploaderProps {
   photos: Record<string, string>;
-  onPhotoAdd: (slot: string, dataUrl: string) => void;
+  onPhotoAdd: (slot: string, url: string) => void;
   onPhotoRemove: (slot: string) => void;
   showDamageSlot?: boolean;
   className?: string;
@@ -41,6 +41,7 @@ export function PhotoUploader({
   const t = useTranslations("sell.form");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeSlotRef = useRef<string>("");
+  const [uploadingSlots, setUploadingSlots] = useState<Set<string>>(new Set());
 
   const slots = PHOTO_SLOTS.filter(
     (slot) => slot.key !== "damage" || showDamageSlot
@@ -49,7 +50,7 @@ export function PhotoUploader({
   const photoCount = Object.keys(photos).length;
 
   const handleFileSelect = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
 
@@ -57,13 +58,38 @@ export function PhotoUploader({
       if (!file.type.startsWith("image/")) return;
       if (file.size > 10 * 1024 * 1024) return; // Max 10MB
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result && typeof reader.result === "string") {
-          onPhotoAdd(activeSlotRef.current, reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      const slot = activeSlotRef.current;
+
+      // Show a loading preview immediately using an object URL
+      const tempUrl = URL.createObjectURL(file);
+      onPhotoAdd(slot, tempUrl);
+      setUploadingSlots((prev) => new Set(prev).add(slot));
+
+      try {
+        // Upload to R2 via API
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Upload failed");
+
+        const { url } = await response.json();
+        // Replace temp URL with the real R2 URL (or data URL fallback in dev)
+        onPhotoAdd(slot, url);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        // Keep the temp object URL as fallback (works locally)
+      } finally {
+        setUploadingSlots((prev) => {
+          const next = new Set(prev);
+          next.delete(slot);
+          return next;
+        });
+      }
 
       // Reset the input so the same file can be re-selected
       event.target.value = "";
@@ -134,13 +160,28 @@ export function PhotoUploader({
               >
                 {hasPhoto ? (
                   <>
-                    <Image
-                      src={photos[slot.key]}
-                      alt={t(slot.labelKey)}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {photos[slot.key].startsWith("blob:") ? (
+                      <img
+                        src={photos[slot.key]}
+                        alt={t(slot.labelKey)}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={photos[slot.key]}
+                        alt={t(slot.labelKey)}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        unoptimized={photos[slot.key].startsWith("data:")}
+                      />
+                    )}
+                    {uploadingSlots.has(slot.key) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md transition-transform hover:scale-110"

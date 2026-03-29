@@ -78,7 +78,9 @@ export default function AdminDashboardPage() {
                 <Building2 className="h-5 w-5 text-amber-500" />
                 <span className="text-sm font-medium">{t("dealerApplications")}</span>
               </div>
-              <Badge variant="secondary">--</Badge>
+              <Badge variant="secondary">
+                {stats?.pendingDealers ?? "--"}
+              </Badge>
             </Link>
             <Link
               href={`/${locale}/admin/listings`}
@@ -88,15 +90,22 @@ export default function AdminDashboardPage() {
                 <AlertTriangle className="h-5 w-5 text-red-500" />
                 <span className="text-sm font-medium">{t("flaggedListings")}</span>
               </div>
-              <Badge variant="secondary">--</Badge>
+              <Badge variant="secondary">
+                {stats?.flaggedListings ?? "--"}
+              </Badge>
             </Link>
-            <div className="flex items-center justify-between rounded-lg border p-3">
+            <Link
+              href={`/${locale}/admin/content`}
+              className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted"
+            >
               <div className="flex items-center gap-3">
                 <Star className="h-5 w-5 text-amber-500" />
                 <span className="text-sm font-medium">{t("pendingReviews")}</span>
               </div>
-              <Badge variant="secondary">--</Badge>
-            </div>
+              <Badge variant="secondary">
+                {stats?.pendingReviews ?? "--"}
+              </Badge>
+            </Link>
           </CardContent>
         </Card>
 
