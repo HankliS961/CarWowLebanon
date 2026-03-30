@@ -88,6 +88,22 @@ export const authRouter = createTRPCRouter({
   sendOtp: publicProcedure
     .input(z.object({ phone: z.string().min(8) }))
     .mutation(async ({ ctx, input }) => {
+      // [DEV BYPASS] Skip Twilio — use fixed code 000000
+      // REVERT: Remove this block and uncomment the production block below
+      if (process.env.NODE_ENV === "development") {
+        const devOtp = "000000";
+        const expires = new Date(Date.now() + 10 * 60 * 1000);
+        await ctx.prisma.verificationToken.deleteMany({
+          where: { identifier: input.phone },
+        });
+        await ctx.prisma.verificationToken.create({
+          data: { identifier: input.phone, token: devOtp, expires },
+        });
+        console.log(`[DEV BYPASS] OTP for ${input.phone}: ${devOtp}`);
+        return { success: true };
+      }
+
+      // --- PRODUCTION CODE (currently active in non-dev) ---
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -116,14 +132,6 @@ export const authRouter = createTRPCRouter({
           });
         } catch (error) {
           console.error("[OTP] Failed to send WhatsApp OTP:", error);
-          if (process.env.NODE_ENV === "development") {
-            console.log(`[DEV] OTP for ${input.phone}: ${otp}`);
-          }
-        }
-      } else {
-        console.warn("[OTP] Twilio not configured. WhatsApp OTP not sent.");
-        if (process.env.NODE_ENV === "development") {
-          console.log(`[DEV] OTP for ${input.phone}: ${otp}`);
         }
       }
 
@@ -137,6 +145,18 @@ export const authRouter = createTRPCRouter({
       otp: z.string().length(6),
     }))
     .mutation(async ({ ctx, input }) => {
+      // [DEV BYPASS] Accept fixed code 000000 without DB lookup
+      // REVERT: Remove this block
+      if (process.env.NODE_ENV === "development" && input.otp === "000000") {
+        console.log(`[DEV BYPASS] OTP verified for ${input.phone}`);
+        // Clean up the dev token
+        await ctx.prisma.verificationToken.deleteMany({
+          where: { identifier: input.phone },
+        });
+        return { verified: true };
+      }
+
+      // --- PRODUCTION CODE ---
       const token = await ctx.prisma.verificationToken.findFirst({
         where: {
           identifier: input.phone,
@@ -177,16 +197,29 @@ export const authRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "No account found with this phone number" });
       }
 
-      // Generate OTP
+      // [DEV BYPASS] Skip Twilio — use fixed code 000000
+      // REVERT: Remove this block and uncomment the production block below
+      if (process.env.NODE_ENV === "development") {
+        const devOtp = "000000";
+        const expires = new Date(Date.now() + 10 * 60 * 1000);
+        await ctx.prisma.verificationToken.deleteMany({
+          where: { identifier: `reset:${input.phone}` },
+        });
+        await ctx.prisma.verificationToken.create({
+          data: { identifier: `reset:${input.phone}`, token: devOtp, expires },
+        });
+        console.log(`[DEV BYPASS] Reset OTP for ${input.phone}: ${devOtp}`);
+        return { success: true };
+      }
+
+      // --- PRODUCTION CODE (currently active in non-dev) ---
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expires = new Date(Date.now() + 10 * 60 * 1000);
 
-      // Clear old tokens for this phone
       await ctx.prisma.verificationToken.deleteMany({
         where: { identifier: `reset:${input.phone}` },
       });
 
-      // Store OTP with "reset:" prefix to distinguish from signup OTPs
       await ctx.prisma.verificationToken.create({
         data: {
           identifier: `reset:${input.phone}`,
@@ -206,12 +239,7 @@ export const authRouter = createTRPCRouter({
           });
         } catch (error) {
           console.error("[Reset] Failed to send WhatsApp:", error);
-          if (process.env.NODE_ENV === "development") {
-            console.log(`[DEV] Reset OTP for ${input.phone}: ${otp}`);
-          }
         }
-      } else if (process.env.NODE_ENV === "development") {
-        console.log(`[DEV] Reset OTP for ${input.phone}: ${otp}`);
       }
 
       return { success: true };
@@ -225,28 +253,37 @@ export const authRouter = createTRPCRouter({
       newPassword: z.string().min(8),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Verify OTP
-      const token = await ctx.prisma.verificationToken.findFirst({
-        where: {
-          identifier: `reset:${input.phone}`,
-          token: input.otp,
-          expires: { gt: new Date() },
-        },
-      });
-
-      if (!token) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired reset code" });
-      }
-
-      // Delete used token
-      await ctx.prisma.verificationToken.delete({
-        where: {
-          identifier_token: {
-            identifier: token.identifier,
-            token: token.token,
+      // [DEV BYPASS] Accept fixed code 000000
+      // REVERT: Remove this block
+      if (process.env.NODE_ENV === "development" && input.otp === "000000") {
+        console.log(`[DEV BYPASS] Reset OTP verified for ${input.phone}`);
+        await ctx.prisma.verificationToken.deleteMany({
+          where: { identifier: `reset:${input.phone}` },
+        });
+      } else {
+        // --- PRODUCTION CODE ---
+        const token = await ctx.prisma.verificationToken.findFirst({
+          where: {
+            identifier: `reset:${input.phone}`,
+            token: input.otp,
+            expires: { gt: new Date() },
           },
-        },
-      });
+        });
+
+        if (!token) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired reset code" });
+        }
+
+        // Delete used token
+        await ctx.prisma.verificationToken.delete({
+          where: {
+            identifier_token: {
+              identifier: token.identifier,
+              token: token.token,
+            },
+          },
+        });
+      }
 
       // Find user and update password
       const user = await ctx.prisma.user.findUnique({

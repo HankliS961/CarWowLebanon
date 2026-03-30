@@ -31,6 +31,13 @@ async function sendWhatsAppMessage(
   to: string,
   body: string
 ): Promise<boolean> {
+  // [DEV BYPASS] Skip all WhatsApp sending — log to console instead
+  // REVERT: Remove this block
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[DEV BYPASS] WhatsApp skipped → to: ${to}, body: ${body.slice(0, 80)}...`);
+    return true;
+  }
+
   const client = getTwilioClient();
   if (!client) {
     console.log("[WhatsApp] No Twilio credentials, skipping API send.");

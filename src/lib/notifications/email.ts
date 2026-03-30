@@ -15,6 +15,13 @@ interface EmailPayload {
  * or when Resend is not configured.
  */
 async function sendEmail(payload: EmailPayload): Promise<{ success: boolean }> {
+  // [DEV BYPASS] Skip all email sending — log to console instead
+  // REVERT: Remove this block
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[DEV BYPASS] Email skipped → to: ${payload.to}, subject: ${payload.subject}`);
+    return { success: true };
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (!resendApiKey) {

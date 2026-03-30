@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, publicProcedure, dealerProcedure } from "../trpc";
 import { estimateCarValue } from "@/lib/valuation/estimate";
+import { notifyNewAuction } from "@/lib/notifications/create";
 
 const carSourceEnum = z.enum([
   "LOCAL",
@@ -189,7 +190,7 @@ export const sellListingsRouter = createTRPCRouter({
           });
         }
 
-        return ctx.prisma.sellListing.update({
+        const updated = await ctx.prisma.sellListing.update({
           where: { id: draftId },
           data: {
             ...data,
@@ -197,9 +198,20 @@ export const sellListingsRouter = createTRPCRouter({
             auctionEndsAt: new Date(Date.now() + durationMs),
           },
         });
+
+        // Notify all verified dealers about this new listing (fire-and-forget)
+        const carTitle = `${data.year} ${data.make} ${data.model}`;
+        notifyNewAuction({
+          sellListingId: updated.id,
+          carTitle,
+          askingPrice: data.askingPriceUsd ? Number(data.askingPriceUsd) : undefined,
+          sellerName: ctx.session.user.name ?? "A seller",
+        }).catch(console.error);
+
+        return updated;
       }
 
-      return ctx.prisma.sellListing.create({
+      const listing = await ctx.prisma.sellListing.create({
         data: {
           ...data,
           sellerId: ctx.session.user.id,
@@ -207,6 +219,17 @@ export const sellListingsRouter = createTRPCRouter({
           auctionEndsAt: new Date(Date.now() + durationMs),
         },
       });
+
+      // Notify all verified dealers about this new listing (fire-and-forget)
+      const carTitle = `${data.year} ${data.make} ${data.model}`;
+      notifyNewAuction({
+        sellListingId: listing.id,
+        carTitle,
+        askingPrice: data.askingPriceUsd ? Number(data.askingPriceUsd) : undefined,
+        sellerName: ctx.session.user.name ?? "A seller",
+      }).catch(console.error);
+
+      return listing;
     }),
 
   /** Get valuation estimate for a car. */

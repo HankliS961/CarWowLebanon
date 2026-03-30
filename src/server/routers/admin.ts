@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, adminProcedure, publicProcedure } from "../trpc";
 import { UserRole, ContentStatus } from "@prisma/client";
 import { deleteFromR2 } from "@/lib/r2";
+import { createNotification } from "@/lib/notifications/create";
 
 /** Admin router — platform administration. */
 export const adminRouter = createTRPCRouter({
@@ -217,7 +218,7 @@ export const adminRouter = createTRPCRouter({
       if (input.action === "APPROVE") {
         await ctx.prisma.car.update({
           where: { id: input.carId },
-          data: { status: "ACTIVE" },
+          data: { status: "ACTIVE", warningReason: null },
         });
       } else if (input.action === "REMOVE") {
         await ctx.prisma.car.update({
@@ -225,14 +226,34 @@ export const adminRouter = createTRPCRouter({
           data: { status: "EXPIRED" },
         });
       } else if (input.action === "WARN") {
+        // Set to DRAFT so dealer can edit and resubmit, store the reason
         await ctx.prisma.car.update({
           where: { id: input.carId },
-          data: { status: "WARNED" },
+          data: { status: "DRAFT", warningReason: input.reason ?? null },
         });
+
+        // Fetch dealer info to notify the right user
+        const dealer = await ctx.prisma.dealer.findUnique({
+          where: { id: car.dealerId },
+          select: { userId: true },
+        });
+
+        if (dealer) {
+          const carTitle = `${car.year} ${car.make} ${car.model}`;
+          createNotification({
+            userId: dealer.userId,
+            type: "LISTING_WARNING",
+            title: `Listing warning: ${carTitle}`,
+            body: input.reason
+              ? `Your listing for ${carTitle} was flagged by an admin: "${input.reason}". The listing has been moved to drafts so you can fix it and resubmit.`
+              : `Your listing for ${carTitle} was flagged by an admin and moved to drafts. Please review and resubmit.`,
+            data: { carId: input.carId, reason: input.reason ?? null },
+          }).catch(console.error);
+        }
       } else if (input.action === "REVOKE_WARN") {
         await ctx.prisma.car.update({
           where: { id: input.carId },
-          data: { status: "ACTIVE" },
+          data: { status: "ACTIVE", warningReason: null },
         });
       }
 

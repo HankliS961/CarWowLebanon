@@ -173,6 +173,43 @@ export async function notifyListingMatch({
 }
 
 /**
+ * Notify all verified dealers about a new auction listing.
+ */
+export async function notifyNewAuction({
+  sellListingId,
+  carTitle,
+  askingPrice,
+  sellerName,
+}: {
+  sellListingId: string;
+  carTitle: string;
+  askingPrice?: number;
+  sellerName: string;
+}) {
+  // Get all verified dealers' user IDs
+  const dealers = await prisma.dealer.findMany({
+    where: { isVerified: true },
+    select: { userId: true },
+  });
+
+  if (dealers.length === 0) return;
+
+  const priceText = askingPrice
+    ? ` — asking $${askingPrice.toLocaleString()}`
+    : "";
+
+  await prisma.notification.createMany({
+    data: dealers.map((d) => ({
+      userId: d.userId,
+      type: "NEW_AUCTION" as const,
+      title: `New auction: ${carTitle}`,
+      body: `${sellerName} listed a ${carTitle} for bidding${priceText}. Place your bid now!`,
+      data: { sellListingId },
+    })),
+  });
+}
+
+/**
  * Notify dealer about a new review.
  */
 export async function notifyReviewReceived({

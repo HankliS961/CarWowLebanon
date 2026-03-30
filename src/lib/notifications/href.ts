@@ -18,7 +18,11 @@ export function getNotificationHref(
     case "PRICE_DROP":
       return data?.carId ? `/cars/${data.carId}` : "/dashboard/saved";
     case "NEW_BID":
-      return "/dashboard/selling";
+      return isDealer ? "/dealer/auctions" : "/dashboard/selling";
+    case "NEW_AUCTION":
+      return "/dealer/auctions";
+    case "LISTING_WARNING":
+      return isDealer ? "/dealer/listings" : "/dashboard";
     case "REVIEW_RECEIVED":
       return isDealer ? "/dealer/reviews" : "/dashboard";
     case "LISTING_MATCH":

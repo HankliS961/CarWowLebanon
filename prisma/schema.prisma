@@ -179,6 +179,8 @@ enum NotificationType {
   NEW_BID
   REVIEW_RECEIVED
   LISTING_MATCH
+  NEW_AUCTION
+  LISTING_WARNING
 }
 
 enum SearchAlertFrequency {
@@ -379,6 +381,7 @@ model Car {
   locationCity     String
   customsPaid      Boolean?
   accidentHistory  Boolean?
+  warningReason    String?       @db.Text
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   expiresAt        DateTime?
