@@ -48,7 +48,7 @@ export const credentialsProvider = Credentials({
         name: true,
         passwordHash: true,
         role: true,
-        avatarUrl: true,
+        image: true,
         isVerified: true,
       },
     });
@@ -67,7 +67,7 @@ export const credentialsProvider = Credentials({
       id: user.id,
       email: user.email,
       name: user.name,
-      image: user.avatarUrl,
+      image: user.image,
     };
   },
 });

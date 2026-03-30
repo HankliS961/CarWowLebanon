@@ -54,16 +54,21 @@ export default async function middleware(request: NextRequest) {
     pathWithoutLocale.startsWith(p)
   );
 
-  if (isProtectedPath) {
-    const token = getSessionToken(request);
+  // Pages that phone-less users are allowed to visit (to avoid redirect loops)
+  const isAuthPage = pathWithoutLocale.startsWith("/auth");
 
+  const token = getSessionToken(request);
+
+  if (isProtectedPath) {
     if (!token) {
       const loginUrl = new URL(`/${locale}/auth/login`, request.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
+  }
 
-    // Decode JWT to check role for role-restricted paths
+  // Decode JWT for role checks and phone verification
+  if (token) {
     const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
     if (secret) {
       try {
@@ -75,25 +80,36 @@ export default async function middleware(request: NextRequest) {
 
         if (decoded) {
           const userRole = decoded.role as string | undefined;
+          const userPhone = decoded.phone as string | undefined;
 
-          // Check role-based access
-          for (const [rolePath, allowedRoles] of Object.entries(ROLE_PATHS)) {
-            if (pathWithoutLocale.startsWith(rolePath)) {
-              if (!userRole || !allowedRoles.includes(userRole)) {
-                // Redirect to homepage — user doesn't have the required role
-                const homeUrl = new URL(`/${locale}`, request.url);
-                homeUrl.searchParams.set("error", "unauthorized");
-                return NextResponse.redirect(homeUrl);
+          // Force phone verification: logged-in users without a phone
+          // must verify their number before using the app
+          if (!userPhone && !isAuthPage) {
+            const verifyUrl = new URL(`/${locale}/auth/verify-phone`, request.url);
+            verifyUrl.searchParams.set("callbackUrl", pathname);
+            return NextResponse.redirect(verifyUrl);
+          }
+
+          // Check role-based access for protected paths
+          if (isProtectedPath) {
+            for (const [rolePath, allowedRoles] of Object.entries(ROLE_PATHS)) {
+              if (pathWithoutLocale.startsWith(rolePath)) {
+                if (!userRole || !allowedRoles.includes(userRole)) {
+                  const homeUrl = new URL(`/${locale}`, request.url);
+                  homeUrl.searchParams.set("error", "unauthorized");
+                  return NextResponse.redirect(homeUrl);
+                }
+                break;
               }
-              break;
             }
           }
         }
       } catch {
-        // JWT decode failed — treat as unauthenticated
-        const loginUrl = new URL(`/${locale}/auth/login`, request.url);
-        loginUrl.searchParams.set("callbackUrl", pathname);
-        return NextResponse.redirect(loginUrl);
+        if (isProtectedPath) {
+          const loginUrl = new URL(`/${locale}/auth/login`, request.url);
+          loginUrl.searchParams.set("callbackUrl", pathname);
+          return NextResponse.redirect(loginUrl);
+        }
       }
     }
   }

@@ -21,7 +21,7 @@ export interface BlogPostCardProps {
   publishedAt: string | null;
   author: {
     name: string | null;
-    avatarUrl: string | null;
+    image: string | null;
   };
   className?: string;
 }
@@ -97,9 +97,9 @@ export function BlogPostCard({
         {/* Author & Date */}
         <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            {author.avatarUrl ? (
+            {author.image ? (
               <Image
-                src={author.avatarUrl}
+                src={author.image}
                 alt={author.name || ""}
                 width={20}
                 height={20}

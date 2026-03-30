@@ -130,7 +130,7 @@ export default async function BlogIndexPage({
                     publishedAt={post.publishedAt?.toISOString() || null}
                     author={{
                       name: post.author.name,
-                      avatarUrl: post.author.avatarUrl,
+                      image: post.author.image,
                     }}
                   />
                 ))}

@@ -4,6 +4,7 @@ import { createTRPCRouter, publicProcedure, dealerProcedure } from "../trpc";
 import { notifyPriceDrop } from "@/lib/notifications/create";
 import { sendPriceDropEmail } from "@/lib/notifications/email";
 import { indexCar, removeCar, searchCars } from "@/lib/meilisearch";
+import { logDealerListingCreated, logDealerListingSold } from "@/lib/market-data/log-price";
 
 /** Cars router — CRUD operations for car listings. */
 export const carsRouter = createTRPCRouter({
@@ -258,6 +259,22 @@ export const carsRouter = createTRPCRouter({
       // Fire-and-forget: index in Meilisearch
       indexCar(car).catch(console.error);
 
+      // Fire-and-forget: log market price data for new active listing
+      if (car.status === "ACTIVE" && input.priceUsd) {
+        logDealerListingCreated(ctx.prisma, {
+          make: input.make,
+          model: input.model,
+          year: input.year,
+          trim: input.trim,
+          mileageKm: input.mileageKm,
+          condition: input.condition,
+          carSource: input.source,
+          askingPriceUsd: input.priceUsd,
+          region: input.locationRegion,
+          carListingId: car.id,
+        }).catch(console.error);
+      }
+
       return car;
     }),
 
@@ -415,7 +432,18 @@ export const carsRouter = createTRPCRouter({
 
       const car = await ctx.prisma.car.findUnique({
         where: { id: input.carId },
-        select: { dealerId: true },
+        select: {
+          dealerId: true,
+          make: true,
+          model: true,
+          year: true,
+          trim: true,
+          mileageKm: true,
+          condition: true,
+          source: true,
+          priceUsd: true,
+          locationRegion: true,
+        },
       });
 
       if (!car) {
@@ -433,6 +461,22 @@ export const carsRouter = createTRPCRouter({
 
       // Fire-and-forget: re-index in Meilisearch (status change affects search visibility)
       indexCar(statusUpdatedCar).catch(console.error);
+
+      // Fire-and-forget: log market price data when listing is marked as sold
+      if (input.status === "SOLD" && car.priceUsd) {
+        logDealerListingSold(ctx.prisma, {
+          make: car.make,
+          model: car.model,
+          year: car.year,
+          trim: car.trim,
+          mileageKm: car.mileageKm,
+          condition: car.condition,
+          carSource: car.source,
+          finalPriceUsd: Number(car.priceUsd),
+          region: car.locationRegion,
+          carListingId: input.carId,
+        }).catch(console.error);
+      }
 
       return statusUpdatedCar;
     }),

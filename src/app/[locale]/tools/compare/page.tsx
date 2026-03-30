@@ -6,7 +6,8 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { BreadcrumbNav } from "@/components/shared/BreadcrumbNav";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/routing";
-import { GitCompare, ArrowRight, Star } from "lucide-react";
+import { GitCompare, ArrowRight } from "lucide-react";
+import { CompareClient } from "./compare-client";
 
 interface CompareToolPageProps {
   params: Promise<{ locale: string }>;
@@ -28,7 +29,6 @@ export default async function CompareToolPage({ params }: CompareToolPageProps) 
     { label: "Compare Cars", labelAr: "مقارنة السيارات" },
   ];
 
-  // Placeholder comparison data — in production this would be interactive with DB lookups
   const popularComparisons = [
     { a: "Toyota RAV4", b: "Kia Sportage", slug: "toyota-rav4-vs-kia-sportage" },
     { a: "Toyota Corolla", b: "Honda Civic", slug: "toyota-corolla-vs-honda-civic" },
@@ -52,39 +52,14 @@ export default async function CompareToolPage({ params }: CompareToolPageProps) 
             </h1>
             <p className="mt-3 text-muted-foreground">
               {isAr
-                ? "اختر 2-3 سيارات لمقارنة المواصفات والأسعار والتقييمات"
-                : "Select 2-3 cars to compare specs, prices, ratings, and features at a glance"}
+                ? "اختر حتى 3 سيارات لمقارنة المواصفات والأسعار والتقييمات"
+                : "Select up to 3 cars to compare specs, prices, ratings, and features at a glance"}
             </p>
           </div>
 
-          {/* Car Selection (placeholder UI) */}
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((slot) => (
-              <div
-                key={slot}
-                className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted p-8 text-center"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <span className="text-lg font-bold">{slot}</span>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {isAr ? `اختر السيارة ${slot}` : `Select Car ${slot}`}
-                </p>
-                <Button variant="outline" size="sm" className="mt-3">
-                  {isAr ? "اختر" : "Choose"}
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 text-center">
-            <Button disabled className="bg-teal-500 text-white">
-              <GitCompare className="me-2 h-4 w-4" />
-              {isAr ? "قارن الآن" : "Compare Now"}
-            </Button>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {isAr ? "اختر سيارتين على الأقل للمقارنة" : "Select at least 2 cars to compare"}
-            </p>
+          {/* Interactive comparison tool */}
+          <div className="mt-8">
+            <CompareClient isAr={isAr} />
           </div>
 
           {/* Popular Comparisons */}

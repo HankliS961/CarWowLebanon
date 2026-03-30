@@ -47,7 +47,7 @@ export interface BlogPostCard {
   viewsCount: number;
   author: {
     name: string | null;
-    avatarUrl: string | null;
+    image: string | null;
   };
 }
 
@@ -79,7 +79,7 @@ export interface CarReviewCard {
   publishedAt: string | null;
   author: {
     name: string | null;
-    avatarUrl: string | null;
+    image: string | null;
   };
 }
 
@@ -206,7 +206,7 @@ export interface RoundupArticle {
   conclusionAr: string;
   entries: RoundupEntry[];
   publishedAt: string;
-  author: { name: string | null; avatarUrl: string | null };
+  author: { name: string | null; image: string | null };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ export interface ComparisonArticle {
     descriptionAr: string;
   }[];
   publishedAt: string;
-  author: { name: string | null; avatarUrl: string | null };
+  author: { name: string | null; image: string | null };
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ export interface GuideFull extends GuideCard {
   seoTitleAr: string | null;
   seoDescriptionEn: string | null;
   seoDescriptionAr: string | null;
-  author: { name: string | null; avatarUrl: string | null };
+  author: { name: string | null; image: string | null };
 }
 
 // ---------------------------------------------------------------------------

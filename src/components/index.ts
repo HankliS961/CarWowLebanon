@@ -23,12 +23,6 @@ export type { DealerCardProps } from "./dealers/DealerCard";
 // === Forms ===
 export { StepWizard } from "./forms/StepWizard";
 export type { StepWizardProps, WizardStep } from "./forms/StepWizard";
-export { PhotoUploader } from "./forms/PhotoUploader";
-export type {
-  PhotoUploaderProps,
-  PhotoAngle,
-  UploadedPhoto,
-} from "./forms/PhotoUploader";
 
 // === Layout ===
 export { Header } from "./layout/Header";

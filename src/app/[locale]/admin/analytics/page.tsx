@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { BarChart3, Users, Building2, Car, MessageSquare, MapPin, AlertTriangle, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart3, Users, Building2, Car, MessageSquare, MapPin, AlertTriangle, Clock, Database } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/shared/metric-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { trpc } from "@/lib/trpc/client";
@@ -25,6 +26,7 @@ export default function AdminAnalyticsPage() {
 
   const { data: stats } = trpc.admin.getStats.useQuery(undefined, { retry: false });
   const { data: regionStats } = trpc.admin.getRegionStats.useQuery(undefined, { retry: false });
+  const { data: marketStats } = trpc.admin.getMarketDataStats.useQuery(undefined, { retry: false });
 
   // Compute region bar data from real DB stats
   const regionData = useMemo(() => {
@@ -146,6 +148,41 @@ export default function AdminAnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Market Data Collection */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-teal-500" />
+            Market Data Collection
+          </CardTitle>
+          <CardDescription>Real price data collected from platform transactions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border p-4">
+              <p className="text-sm text-muted-foreground">Total Data Points</p>
+              <p className="text-2xl font-bold">{marketStats?.total ?? 0}</p>
+            </div>
+            {marketStats?.bySource.map((s: any) => (
+              <div key={s.source} className="rounded-lg border p-4">
+                <p className="text-sm text-muted-foreground">{s.source.replace(/_/g, " ")}</p>
+                <p className="text-2xl font-bold">{s.count}</p>
+              </div>
+            ))}
+          </div>
+          {marketStats?.topMakes && marketStats.topMakes.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-2">Top Makes by Data Points</p>
+              <div className="flex flex-wrap gap-2">
+                {marketStats.topMakes.map((m: any) => (
+                  <Badge key={m.make} variant="outline">{m.make}: {m.count}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

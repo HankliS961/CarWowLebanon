@@ -27,7 +27,9 @@ import {
   DollarSign,
   UserCheck,
   Loader2,
-  TrendingUp,
+  Gavel,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
 
@@ -172,8 +174,9 @@ export default function ValuationFormPage() {
     }
   }, [loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Persist current form state to the database. */
+  /** Persist current form state to the database (only when logged in). */
   const saveCurrentDraft = (opts?: { showToast?: boolean }) => {
+    if (!session?.user) return;
     saveDraftMutation.mutate(
       {
         draftId: activeDraftId || undefined,
@@ -241,20 +244,6 @@ export default function ValuationFormPage() {
     { enabled: !!store.makeSlug }
   );
 
-  // Fetch valuation when on step 4
-  const { data: valuation, isLoading: valuationLoading } = trpc.sellListings.getValuation.useQuery(
-    {
-      make: store.make,
-      year: parseInt(store.year, 10) || 2020,
-      mileageKm: parseInt(store.mileageKm, 10) || 0,
-      source: (store.source as "LOCAL" | "IMPORTED_USA" | "IMPORTED_GULF" | "IMPORTED_EUROPE" | "SALVAGE_REBUILT") || "LOCAL",
-      accidentHistory: store.accidentHistory ?? undefined,
-      hasDamage: store.hasDamage ?? undefined,
-      serviceRecords: (store.serviceRecords as "full" | "partial" | "none") || undefined,
-    },
-    { enabled: store.currentStep >= 4 && !!store.make && !!store.year }
-  );
-
   // Create listing mutation
   const createListing = trpc.sellListings.create.useMutation({
     onSuccess: () => {
@@ -277,13 +266,62 @@ export default function ValuationFormPage() {
   const canProceedStep2 = store.accidentHistory !== null && store.serviceRecords && store.numberOfKeys;
   const canProceedStep3 = Object.keys(store.photos).length >= 4;
   const canProceedStep4 = store.sellingOption === "auction" || (store.sellingOption === "asking_price" && store.askingPrice);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const handleNext = () => {
     saveCurrentDraft(); // auto-save to DB on step advance
     store.nextStep();
   };
 
-  const handleSubmit = () => {
+  /** Upload any data-URL photos to R2 (needed when user added photos before signing in). */
+  const uploadPendingPhotos = async (): Promise<string[]> => {
+    const entries = Object.entries(store.photos).filter(([, url]) => Boolean(url));
+    const urls: string[] = [];
+
+    for (const [slot, url] of entries) {
+      if (url.startsWith("data:")) {
+        // Convert data URL to File and upload to R2
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const formData = new FormData();
+        formData.append("file", blob, `${slot}.jpg`);
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) throw new Error("Photo upload failed");
+        const { url: r2Url } = await uploadRes.json();
+        store.setPhoto(slot, r2Url);
+        urls.push(r2Url);
+      } else {
+        urls.push(url);
+      }
+    }
+
+    return urls;
+  };
+
+  const handleSubmit = async () => {
+    // Re-upload any data URL photos to R2 first
+    const hasDataUrls = Object.values(store.photos).some((url) => url.startsWith("data:"));
+    let images: string[];
+
+    if (hasDataUrls) {
+      setUploadingPhotos(true);
+      try {
+        images = await uploadPendingPhotos();
+      } catch {
+        toast.error(locale === "ar" ? "فشل رفع الصور، حاول مجدداً" : "Failed to upload photos, please try again");
+        setUploadingPhotos(false);
+        return;
+      }
+      setUploadingPhotos(false);
+    } else {
+      images = Object.values(store.photos).filter(Boolean);
+    }
+
     createListing.mutate({
       draftId: activeDraftId || undefined,
       make: store.make,
@@ -296,9 +334,9 @@ export default function ValuationFormPage() {
       conditionDescription: store.additionalNotes || undefined,
       conditionCheckboxes: store.damageTypes.length > 0 ? store.damageTypes : undefined,
       askingPriceUsd: store.sellingOption === "asking_price" ? parseFloat(store.askingPrice) : undefined,
-      estimatedValueMinUsd: valuation?.minUsd,
-      estimatedValueMaxUsd: valuation?.maxUsd,
-      images: Object.values(store.photos).filter(Boolean),
+      estimatedValueMinUsd: undefined,
+      estimatedValueMaxUsd: undefined,
+      images,
       isAuction: store.sellingOption === "auction",
     });
   };
@@ -609,26 +647,17 @@ export default function ValuationFormPage() {
               <div className="space-y-6">
                 <h2 className="text-lg font-semibold">{t("valuation")}</h2>
 
-                {/* Valuation display */}
-                <div className="rounded-xl border-2 border-teal-200 bg-teal-50/30 p-6 text-center">
-                  <p className="text-sm font-medium text-teal-700">{t("valuationTitle")}</p>
-                  {valuationLoading ? (
-                    <Loader2 className="mx-auto mt-3 h-8 w-8 animate-spin text-teal-500" />
-                  ) : valuation ? (
-                    <>
-                      <div className="mt-3 flex items-center justify-center gap-2">
-                        <TrendingUp className="h-6 w-6 text-teal-600" />
-                        <span className="font-mono text-3xl font-bold text-teal-700">
-                          {formatPriceUsd(valuation.minUsd)} - {formatPriceUsd(valuation.maxUsd)}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-teal-600">{t("valuationBased")}</p>
-                    </>
-                  ) : (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {locale === "ar" ? "غير متاح" : "Not available"}
-                    </p>
-                  )}
+                {/* Let the Market Decide */}
+                <div className="rounded-xl border-2 border-teal-100 bg-gradient-to-br from-teal-50 to-white p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100">
+                    <Gavel className="h-6 w-6 text-teal-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold">{locale === "ar" ? "دع السوق يقرر" : "Let the Market Decide"}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {locale === "ar"
+                      ? "تجار معتمدون سيقدمون عروض منافسة. ستتلقى عروض حقيقية خلال 24 ساعة."
+                      : "Verified dealers will submit competing bids. You'll see real offers within 24 hours."}
+                  </p>
                 </div>
 
                 {/* Selling option */}
@@ -677,58 +706,133 @@ export default function ValuationFormPage() {
               <div className="space-y-5">
                 <h2 className="text-lg font-semibold">{t("account")}</h2>
 
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">{t("contactPreference")}</Label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {(["WHATSAPP", "CALL", "EMAIL"] as const).map((val) => (
-                      <RadioOption
-                        key={val}
-                        selected={store.contactPreference === val}
-                        onClick={() => store.updateField("contactPreference", val)}
-                        label={t(val === "WHATSAPP" ? "contactWhatsApp" : val === "CALL" ? "contactPhone" : "contactEmail")}
-                      />
-                    ))}
-                  </div>
-                </div>
+                {!session?.user ? (
+                  /* ── Not logged in: prompt to create account or sign in ── */
+                  <div className="space-y-6">
+                    <div className="rounded-xl border-2 border-teal-100 bg-gradient-to-br from-teal-50 to-white p-6 text-center">
+                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100">
+                        <UserPlus className="h-6 w-6 text-teal-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold">
+                        {locale === "ar" ? "أنشئ حسابك لنشر إعلانك" : "Create an Account to List Your Car"}
+                      </h3>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {locale === "ar"
+                          ? "معلومات سيارتك محفوظة. أنشئ حساباً أو سجّل دخولك لإرسال الإعلان واستقبال عروض التجار."
+                          : "Your car details are saved. Create an account or sign in to submit your listing and receive dealer offers."}
+                      </p>
+                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                        <Button asChild className="bg-teal-600 hover:bg-teal-700">
+                          <a href={`/${locale}/auth/register?callbackUrl=/${locale}/sell-my-car/valuation`}>
+                            <UserPlus className="me-2 h-4 w-4" />
+                            {locale === "ar" ? "إنشاء حساب" : "Create Account"}
+                          </a>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <a href={`/${locale}/auth/login?callbackUrl=/${locale}/sell-my-car/valuation`}>
+                            <LogIn className="me-2 h-4 w-4" />
+                            {locale === "ar" ? "تسجيل الدخول" : "Sign In"}
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
 
-                {/* Summary */}
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <h3 className="text-sm font-semibold">
-                    {locale === "ar" ? "ملخص الإعلان" : "Listing Summary"}
-                  </h3>
-                  <div className="mt-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t("make")}</span>
-                      <span className="font-medium">{store.make}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t("model")}</span>
-                      <span className="font-medium">{store.model}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t("year")}</span>
-                      <span className="font-medium">{store.year}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t("mileage")}</span>
-                      <span className="font-medium">{parseInt(store.mileageKm, 10)?.toLocaleString()} km</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {locale === "ar" ? "الصور" : "Photos"}
-                      </span>
-                      <span className="font-medium">{Object.keys(store.photos).length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {locale === "ar" ? "طريقة البيع" : "Selling Method"}
-                      </span>
-                      <span className="font-medium">
-                        {store.sellingOption === "auction" ? t("optionAuction") : formatPriceUsd(parseFloat(store.askingPrice) || 0)}
-                      </span>
+                    {/* Summary (still shown so user sees their data is preserved) */}
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <h3 className="text-sm font-semibold">
+                        {locale === "ar" ? "ملخص الإعلان" : "Listing Summary"}
+                      </h3>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("make")}</span>
+                          <span className="font-medium">{store.make}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("model")}</span>
+                          <span className="font-medium">{store.model}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("year")}</span>
+                          <span className="font-medium">{store.year}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("mileage")}</span>
+                          <span className="font-medium">{parseInt(store.mileageKm, 10)?.toLocaleString()} km</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {locale === "ar" ? "الصور" : "Photos"}
+                          </span>
+                          <span className="font-medium">{Object.keys(store.photos).length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {locale === "ar" ? "طريقة البيع" : "Selling Method"}
+                          </span>
+                          <span className="font-medium">
+                            {store.sellingOption === "auction" ? t("optionAuction") : formatPriceUsd(parseFloat(store.askingPrice) || 0)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* ── Logged in: show contact preference & submit ── */
+                  <>
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold">{t("contactPreference")}</Label>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {(["WHATSAPP", "CALL", "EMAIL"] as const).map((val) => (
+                          <RadioOption
+                            key={val}
+                            selected={store.contactPreference === val}
+                            onClick={() => store.updateField("contactPreference", val)}
+                            label={t(val === "WHATSAPP" ? "contactWhatsApp" : val === "CALL" ? "contactPhone" : "contactEmail")}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <h3 className="text-sm font-semibold">
+                        {locale === "ar" ? "ملخص الإعلان" : "Listing Summary"}
+                      </h3>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("make")}</span>
+                          <span className="font-medium">{store.make}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("model")}</span>
+                          <span className="font-medium">{store.model}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("year")}</span>
+                          <span className="font-medium">{store.year}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{t("mileage")}</span>
+                          <span className="font-medium">{parseInt(store.mileageKm, 10)?.toLocaleString()} km</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {locale === "ar" ? "الصور" : "Photos"}
+                          </span>
+                          <span className="font-medium">{Object.keys(store.photos).length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {locale === "ar" ? "طريقة البيع" : "Selling Method"}
+                          </span>
+                          <span className="font-medium">
+                            {store.sellingOption === "auction" ? t("optionAuction") : formatPriceUsd(parseFloat(store.askingPrice) || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -746,19 +850,22 @@ export default function ValuationFormPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={saveDraft}
-              disabled={saveDraftMutation.isPending}
-            >
-              {saveDraftMutation.isPending ? (
-                <Loader2 className="me-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="me-2 h-4 w-4" />
-              )}
-              {t("saveDraft")}
-            </Button>
+            {/* Save draft only when logged in */}
+            {session?.user && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={saveDraft}
+                disabled={saveDraftMutation.isPending}
+              >
+                {saveDraftMutation.isPending ? (
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="me-2 h-4 w-4" />
+                )}
+                {t("saveDraft")}
+              </Button>
+            )}
 
             {store.currentStep < 5 ? (
               <Button
@@ -773,13 +880,18 @@ export default function ValuationFormPage() {
                 {locale === "ar" ? "التالي" : "Next"}
                 <ArrowRight className="ms-2 h-4 w-4" />
               </Button>
-            ) : (
+            ) : session?.user ? (
               <Button
                 onClick={handleSubmit}
-                disabled={createListing.isPending}
+                disabled={createListing.isPending || uploadingPhotos}
                 className="bg-teal-600 hover:bg-teal-700"
               >
-                {createListing.isPending ? (
+                {uploadingPhotos ? (
+                  <>
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                    {locale === "ar" ? "جاري رفع الصور..." : "Uploading photos..."}
+                  </>
+                ) : createListing.isPending ? (
                   <>
                     <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     {t("submitting")}
@@ -791,7 +903,7 @@ export default function ValuationFormPage() {
                   </>
                 )}
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -81,8 +81,16 @@ export function PhotoUploader({
         // Replace temp URL with the real R2 URL (or data URL fallback in dev)
         onPhotoAdd(slot, url);
       } catch (error) {
-        console.error("Upload failed:", error);
-        // Keep the temp object URL as fallback (works locally)
+        console.error("Upload failed, saving as data URL:", error);
+        // Convert to base64 data URL so it survives localStorage persistence
+        // (blob: URLs die on page reload, data URLs don't)
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === "string") {
+            onPhotoAdd(slot, reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
       } finally {
         setUploadingSlots((prev) => {
           const next = new Set(prev);

@@ -44,7 +44,7 @@ export const contentRouter = createTRPCRouter({
           skip,
           take: input.limit,
           include: {
-            author: { select: { id: true, name: true, avatarUrl: true } },
+            author: { select: { id: true, name: true, image: true } },
           },
         }),
         ctx.prisma.blogPost.count({ where }),
@@ -64,7 +64,7 @@ export const contentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const post = await ctx.prisma.blogPost.findUnique({
         where: { slug: input.slug },
-        include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        include: { author: { select: { id: true, name: true, image: true } } },
       });
 
       if (post) {
@@ -96,7 +96,7 @@ export const contentRouter = createTRPCRouter({
         orderBy: { publishedAt: "desc" },
         take: input.limit,
         include: {
-          author: { select: { name: true, avatarUrl: true } },
+          author: { select: { name: true, image: true } },
         },
       });
     }),
@@ -148,7 +148,7 @@ export const contentRouter = createTRPCRouter({
           orderBy: { publishedAt: "desc" },
           skip,
           take: input.limit,
-          include: { author: { select: { name: true, avatarUrl: true } } },
+          include: { author: { select: { name: true, image: true } } },
         }),
         ctx.prisma.carReview.count({ where }),
       ]);
@@ -172,7 +172,7 @@ export const contentRouter = createTRPCRouter({
           status: "PUBLISHED",
         },
         orderBy: { year: "desc" },
-        include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        include: { author: { select: { id: true, name: true, image: true } } },
       });
 
       if (review) {
@@ -190,7 +190,7 @@ export const contentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const review = await ctx.prisma.carReview.findUnique({
         where: { slug: input.slug },
-        include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        include: { author: { select: { id: true, name: true, image: true } } },
       });
 
       if (review) {

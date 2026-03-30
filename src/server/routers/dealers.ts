@@ -64,7 +64,7 @@ export const dealersRouter = createTRPCRouter({
             orderBy: { createdAt: "desc" },
             take: 5,
             include: {
-              buyer: { select: { name: true, avatarUrl: true } },
+              buyer: { select: { name: true, image: true } },
             },
           },
           _count: { select: { cars: { where: { status: "ACTIVE" } } } },

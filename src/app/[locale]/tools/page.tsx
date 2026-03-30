@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Wrench,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ToolsHubPageProps {
   params: Promise<{ locale: string }>;
@@ -102,12 +103,23 @@ export default async function ToolsHubPage({ params }: ToolsHubPageProps) {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {tools.map((tool) => {
             const Icon = tool.icon;
+            const isComingSoon = tool.slug === "valuation";
             return (
               <Link
                 key={tool.slug}
                 href={`/tools/${tool.slug}`}
-                className="group flex flex-col rounded-lg border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:border-teal-200"
+                className={cn(
+                  "group relative flex flex-col rounded-lg border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:border-teal-200",
+                  isComingSoon && "opacity-60 pointer-events-none"
+                )}
+                tabIndex={isComingSoon ? -1 : undefined}
+                aria-disabled={isComingSoon || undefined}
               >
+                {isComingSoon && (
+                  <span className="absolute end-3 top-3 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                    {isAr ? "قريباً" : "Coming Soon"}
+                  </span>
+                )}
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-50 text-teal-500 transition-colors group-hover:bg-teal-500 group-hover:text-white">
                   <Icon className="h-6 w-6" />
                 </div>

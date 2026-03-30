@@ -28,11 +28,12 @@ export const authConfig: NextAuthConfig = {
         // Fetch full user data from database for role
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { role: true, languagePref: true },
+          select: { role: true, languagePref: true, phone: true },
         });
         if (dbUser) {
           token.role = dbUser.role;
           token.languagePref = dbUser.languagePref;
+          token.phone = dbUser.phone;
         }
       }
 
@@ -40,6 +41,7 @@ export const authConfig: NextAuthConfig = {
       if (trigger === "update" && session) {
         if (session.role) token.role = session.role;
         if (session.languagePref) token.languagePref = session.languagePref;
+        if (session.phone) token.phone = session.phone;
       }
 
       return token;

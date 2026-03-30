@@ -530,4 +530,27 @@ export const adminRouter = createTRPCRouter({
         orderBy: { sortOrder: "asc" },
       });
     }),
+
+  /** Get market data collection statistics for analytics dashboard. */
+  getMarketDataStats: adminProcedure.query(async ({ ctx }) => {
+    const [total, bySource, topMakes] = await Promise.all([
+      ctx.prisma.marketPriceData.count(),
+      ctx.prisma.marketPriceData.groupBy({
+        by: ["source"],
+        _count: true,
+      }),
+      ctx.prisma.marketPriceData.groupBy({
+        by: ["make"],
+        _count: true,
+        orderBy: { _count: { make: "desc" } },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      total,
+      bySource: bySource.map((s: any) => ({ source: s.source, count: s._count })),
+      topMakes: topMakes.map((m: any) => ({ make: m.make, count: m._count })),
+    };
+  }),
 });

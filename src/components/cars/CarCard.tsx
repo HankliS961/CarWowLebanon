@@ -10,6 +10,7 @@ import { formatMileage } from "@/lib/utils";
 import type { CarCardData } from "@/types";
 import { Fuel, Gauge, Calendar, Settings2, MapPin, ShieldCheck } from "lucide-react";
 import { SaveCarButton } from "@/components/cars/SaveCarButton";
+import { CompareButton } from "@/components/cars/CompareButton";
 import type { Locale } from "@/i18n/config";
 
 export interface CarCardProps {
@@ -52,6 +53,7 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
             </Badge>
           )}
           <SaveCarButton carId={car.id} variant="overlay" />
+          <CompareButton carId={car.id} variant="icon" className="absolute end-2 top-10" />
         </div>
 
         {/* Content */}
@@ -112,8 +114,9 @@ export function CarCard({ car, className, variant = "grid" }: CarCardProps) {
             <Badge variant="secondary">{tc("negotiable")}</Badge>
           )}
         </div>
-        {/* Save button */}
+        {/* Save & Compare buttons */}
         <SaveCarButton carId={car.id} variant="overlay" />
+        <CompareButton carId={car.id} variant="icon" className="absolute end-2 top-10" />
       </div>
 
       {/* Content */}

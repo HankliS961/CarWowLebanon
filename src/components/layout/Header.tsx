@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc/client";
 import {
   Menu,
   X,
@@ -36,8 +37,31 @@ import {
   LogOut,
   ShieldCheck,
   Store,
+  GitCompareArrows,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
+
+/** Small badge in the header showing compare list count. */
+function CompareHeaderBadge() {
+  const { data: count } = trpc.compare.count.useQuery(undefined, {
+    retry: false,
+  });
+
+  if (!count || count === 0) return null;
+
+  return (
+    <Link
+      href="/tools/compare"
+      className="relative hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
+      aria-label={`Compare (${count})`}
+    >
+      <GitCompareArrows className="h-5 w-5" />
+      <span className="absolute -end-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white">
+        {count}
+      </span>
+    </Link>
+  );
+}
 
 interface NavItem {
   href: string;
@@ -136,6 +160,8 @@ export function Header() {
               <Heart className="h-5 w-5" />
             </Link>
           )}
+
+          {isLoggedIn && <CompareHeaderBadge />}
 
           {isLoggedIn ? (
             <DropdownMenu>

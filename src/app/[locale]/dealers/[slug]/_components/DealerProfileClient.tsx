@@ -68,7 +68,7 @@ interface DealerData {
     title: string | null;
     body: string | null;
     createdAt: Date;
-    buyer: { name: string | null; avatarUrl: string | null };
+    buyer: { name: string | null; image: string | null };
   }>;
   _count: { cars: number };
 }

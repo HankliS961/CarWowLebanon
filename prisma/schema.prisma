@@ -192,6 +192,12 @@ enum ContentStatus {
   PUBLISHED
 }
 
+enum MarketPriceSource {
+  SELL_AUCTION_ACCEPTED  // Bid accepted on a sell listing
+  DEALER_LISTING_CREATED // Dealer listed a car with a price
+  DEALER_LISTING_SOLD    // Dealer marked a listing as sold
+}
+
 // ============================================================================
 // NEXTAUTH.JS REQUIRED TABLES
 // ============================================================================
@@ -243,21 +249,22 @@ model VerificationToken {
 // ============================================================================
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  phone        String?   @unique
-  passwordHash String?
-  name         String?
-  role         UserRole  @default(BUYER)
-  avatarUrl    String?
+  id            String    @id @default(uuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String?
+  name          String?
+  role          UserRole  @default(BUYER)
+  image         String?   // NextAuth adapter field — used as avatar URL
+  emailVerified DateTime? // NextAuth adapter field
   locationRegion Region?
-  locationCity String?
-  languagePref Language  @default(AR)
-  isVerified   Boolean   @default(false)
-  googleId     String?   @unique
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  lastLoginAt  DateTime?
+  locationCity  String?
+  languagePref  Language  @default(AR)
+  isVerified    Boolean   @default(false)
+  googleId      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
 
   // NextAuth relations
   accounts Account[]
@@ -269,6 +276,7 @@ model User {
   configurations  CarConfiguration[]
   sellListings    SellListing[]
   savedCars       SavedCar[]
+  compareList     CompareList[]
   searchAlerts    SearchAlert[]
   notifications   Notification[]
   dealerReviews   DealerReview[]
@@ -377,7 +385,8 @@ model Car {
 
   dealer    Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   inquiries Inquiry[]
-  savedBy   SavedCar[]
+  savedBy     SavedCar[]
+  compareList CompareList[]
 
   @@index([make, model])
   @@index([priceUsd])
@@ -664,6 +673,20 @@ model SavedCar {
   @@map("saved_cars")
 }
 
+model CompareList {
+  id        String   @id @default(uuid())
+  userId    String
+  carId     String
+  addedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  car  Car  @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, carId])
+  @@index([userId])
+  @@map("compare_lists")
+}
+
 model SearchAlert {
   id              String               @id @default(uuid())
   userId          String
@@ -768,4 +791,35 @@ model AdminLog {
   @@index([adminId])
   @@index([createdAt(sort: Desc)])
   @@map("admin_logs")
+}
+
+// ============================================================================
+// MARKET DATA — Silent price collection from platform transactions
+// ============================================================================
+
+model MarketPriceData {
+  id                 String            @id @default(uuid())
+  make               String
+  model              String
+  year               Int
+  trim               String?
+  mileageKm          Int?
+  source             MarketPriceSource
+  condition          CarCondition?
+  carSource          CarSource?        // LOCAL, IMPORTED_USA, etc.
+  finalPriceUsd      Decimal?          @db.Decimal(12, 2) // actual transaction price
+  askingPriceUsd     Decimal?          @db.Decimal(12, 2) // listed/asking price
+  bidCount           Int?
+  auctionDurationHrs Int?
+  region             Region?
+  sellListingId      String?
+  carListingId       String?
+  createdAt          DateTime          @default(now())
+
+  @@index([make, model])
+  @@index([make, model, year])
+  @@index([year])
+  @@index([source])
+  @@index([createdAt(sort: Desc)])
+  @@map("market_price_data")
 }

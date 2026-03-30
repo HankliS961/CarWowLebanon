@@ -72,7 +72,7 @@ export const phoneOtpProvider = Credentials({
         id: true,
         email: true,
         name: true,
-        avatarUrl: true,
+        image: true,
       },
     });
 
@@ -88,7 +88,7 @@ export const phoneOtpProvider = Credentials({
           id: true,
           email: true,
           name: true,
-          avatarUrl: true,
+          image: true,
         },
       });
     }
@@ -97,7 +97,7 @@ export const phoneOtpProvider = Credentials({
       id: user.id,
       email: user.email,
       name: user.name,
-      image: user.avatarUrl,
+      image: user.image,
     };
   },
 });

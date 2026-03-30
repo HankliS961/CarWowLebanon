@@ -16,6 +16,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "@/i18n/routing";
 import { trpc } from "@/lib/trpc/client";
 import { SaveCarButton } from "@/components/cars/SaveCarButton";
+import { CompareButton } from "@/components/cars/CompareButton";
 import {
   ChevronLeft,
   ChevronRight,
@@ -176,8 +177,9 @@ export function CarDetailClient({
                   )}
                 </div>
 
-                {/* Save button overlay */}
+                {/* Save & Compare button overlays */}
                 <SaveCarButton carId={car.id} variant="overlay" className="z-10" />
+                <CompareButton carId={car.id} variant="icon" className="absolute end-2 top-12 z-10" />
 
                 {/* Image counter */}
                 {allImages.length > 1 && (
@@ -240,6 +242,11 @@ export function CarDetailClient({
                   </Button>
                 )}
               </div>
+            </div>
+
+            {/* Compare button (inline) */}
+            <div className="mt-4">
+              <CompareButton carId={car.id} variant="inline" />
             </div>
 
             {/* Specs grid */}

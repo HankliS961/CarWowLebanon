@@ -83,7 +83,7 @@ export default function AdminListingsPage() {
     return [...allCars, ...nonActive];
   })();
 
-  const handleModerate = (carId: string, action: "APPROVE" | "REMOVE" | "WARN") => {
+  const handleModerate = (carId: string, action: "APPROVE" | "REMOVE" | "WARN" | "REVOKE_WARN") => {
     moderateListing.mutate({ carId, action });
   };
 

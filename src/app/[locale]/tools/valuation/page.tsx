@@ -4,10 +4,9 @@ import { generateWebApplicationSchema } from "@/lib/seo/json-ld";
 import { absoluteUrl } from "@/lib/utils";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { BreadcrumbNav } from "@/components/shared/BreadcrumbNav";
-import { ValuationForm } from "@/components/tools/ValuationForm";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { Tag, ArrowRight } from "lucide-react";
+import { Tag, Calculator } from "lucide-react";
 
 interface ValuationToolPageProps {
   params: Promise<{ locale: string }>;
@@ -44,38 +43,26 @@ export default async function ValuationToolPage({ params }: ValuationToolPagePro
             <h1 className="text-3xl font-bold text-charcoal">
               {isAr ? "أداة تقييم السيارات — لبنان" : "Car Valuation Tool — Lebanon"}
             </h1>
+          </div>
+
+          <div className="mx-auto max-w-lg py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-100">
+              <Calculator className="h-8 w-8 text-teal-600" />
+            </div>
+            <h2 className="text-2xl font-bold">{isAr ? "قريباً" : "Coming Soon"}</h2>
             <p className="mt-3 text-muted-foreground">
               {isAr
-                ? "احصل على تقدير فوري لقيمة سيارتك في السوق اللبناني"
-                : "Get an instant estimate of your car's market value in Lebanon based on make, model, year, and condition"}
+                ? "نحن نبني أداة تقييم مخصصة للسوق اللبناني باستخدام بيانات حقيقية من منصتنا."
+                : "We're building a Lebanon-specific valuation tool using real market data from our platform."}
             </p>
-          </div>
-
-          <div className="mt-8">
-            <ValuationForm />
-          </div>
-
-          <div className="mt-12 space-y-4 text-sm text-muted-foreground">
-            <h2 className="text-lg font-semibold text-charcoal">
-              {isAr ? "كيف يعمل التقييم؟" : "How Does Our Valuation Work?"}
-            </h2>
-            <p>
+            <p className="mt-2 text-sm text-muted-foreground">
               {isAr
-                ? "يستخدم نموذجنا بيانات السوق اللبنانية ومعدلات الاستهلاك ومقارنة مع سيارات مشابهة لتقدير القيمة السوقية العادلة. الحالة والمصدر والكيلومتراج تؤثر جميعها على التقييم."
-                : "Our model uses Lebanese market data, depreciation rates, and comparison with similar vehicles to estimate fair market value. Condition, source, and mileage all affect the valuation."}
+                ? "في غضون ذلك، قم بإدراج سيارتك واحصل على عروض حقيقية من التجار."
+                : "In the meantime, list your car and get real offers from verified dealers."}
             </p>
-
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/sell-my-car">{isAr ? "بيع سيارتي" : "Sell My Car"}<ArrowRight className="ms-1.5 h-3.5 w-3.5 rtl:rotate-180" /></Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/cars">{isAr ? "تصفح السيارات" : "Browse Cars"}</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/blog/market-analysis">{isAr ? "تحليل السوق" : "Market Analysis"}</Link>
-              </Button>
-            </div>
+            <Button asChild className="mt-6">
+              <Link href="/sell-my-car">{isAr ? "بيع سيارتك" : "Sell Your Car"}</Link>
+            </Button>
           </div>
         </div>
       </section>

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, dealerProcedure } from "../trpc";
 import { notifyNewBid, notifyBidAccepted } from "@/lib/notifications/create";
 import { sendNewBidEmail, sendBidAcceptedEmail } from "@/lib/notifications/email";
+import { logSellListingAccepted } from "@/lib/market-data/log-price";
 
 /** Sell Bids router — dealer bids on sell listings. */
 export const sellBidsRouter = createTRPCRouter({
@@ -139,7 +140,8 @@ export const sellBidsRouter = createTRPCRouter({
       ]);
 
       // Notify winning dealer
-      const carTitle = `${bid.sellListing.year} ${bid.sellListing.make} ${bid.sellListing.model}`;
+      const listing = bid.sellListing;
+      const carTitle = `${listing.year} ${listing.make} ${listing.model}`;
       try {
         const dealerData = bid.dealer;
         await notifyBidAccepted({
@@ -159,6 +161,30 @@ export const sellBidsRouter = createTRPCRouter({
         }
       } catch (notifError) {
         console.error("[BidAccept] Notification error:", notifError);
+      }
+
+      // Fire-and-forget: log market price data for accepted sell listing
+      if (listing.make && listing.model && listing.year) {
+        const bidCount = await ctx.prisma.sellBid.count({
+          where: { sellListingId: listing.id },
+        });
+
+        logSellListingAccepted(ctx.prisma, {
+          make: listing.make,
+          model: listing.model,
+          year: listing.year,
+          trim: listing.trim,
+          mileageKm: listing.mileageKm,
+          carSource: listing.source,
+          finalPriceUsd: Number(bid.bidAmountUsd),
+          askingPriceUsd: listing.askingPriceUsd ? Number(listing.askingPriceUsd) : null,
+          bidCount,
+          auctionDurationHrs: listing.auctionEndsAt
+            ? Math.round((listing.auctionEndsAt.getTime() - listing.createdAt.getTime()) / (1000 * 60 * 60))
+            : null,
+          region: null,
+          sellListingId: listing.id,
+        }).catch(console.error);
       }
 
       return { success: true };

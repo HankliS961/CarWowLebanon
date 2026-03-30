@@ -55,7 +55,7 @@ export const reviewsRouter = createTRPCRouter({
         skip,
         take: input.limit,
         include: {
-          buyer: { select: { name: true, avatarUrl: true } },
+          buyer: { select: { name: true, image: true } },
         },
       });
     }),
@@ -81,7 +81,7 @@ export const reviewsRouter = createTRPCRouter({
           skip,
           take: input.limit,
           include: {
-            buyer: { select: { name: true, avatarUrl: true } },
+            buyer: { select: { name: true, image: true } },
           },
         }),
         ctx.prisma.dealerReview.count({ where: { dealerId: dealer.id } }),
@@ -154,7 +154,7 @@ export const reviewsRouter = createTRPCRouter({
           skip,
           take: input.limit,
           include: {
-            buyer: { select: { name: true, avatarUrl: true } },
+            buyer: { select: { name: true, image: true } },
             dealer: { select: { companyName: true, slug: true, logoUrl: true } },
           },
         }),
@@ -175,7 +175,7 @@ export const reviewsRouter = createTRPCRouter({
         skip,
         take: input.limit,
         include: {
-          author: { select: { name: true, avatarUrl: true } },
+          author: { select: { name: true, image: true } },
         },
       });
     }),
@@ -186,7 +186,7 @@ export const reviewsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const review = await ctx.prisma.carReview.findUnique({
         where: { slug: input.slug },
-        include: { author: { select: { name: true, avatarUrl: true } } },
+        include: { author: { select: { name: true, image: true } } },
       });
 
       if (review) {

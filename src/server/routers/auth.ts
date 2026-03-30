@@ -56,6 +56,34 @@ export const authRouter = createTRPCRouter({
       return user;
     }),
 
+  /** Link a verified phone number to the current user's account (used after Google OAuth sign-in). */
+  linkPhone: protectedProcedure
+    .input(z.object({ phone: z.string().min(8) }))
+    .mutation(async ({ ctx, input }) => {
+      // Check if another user already has this phone number
+      const existingUser = await ctx.prisma.user.findUnique({
+        where: { phone: input.phone },
+      });
+
+      if (existingUser && existingUser.id !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This phone number is already linked to another account",
+        });
+      }
+
+      // Update the current user's phone number
+      await ctx.prisma.user.update({
+        where: { id: ctx.session.user.id },
+        data: {
+          phone: input.phone,
+          isVerified: true,
+        },
+      });
+
+      return { success: true };
+    }),
+
   /** Send an OTP to a phone number for verification via WhatsApp. */
   sendOtp: publicProcedure
     .input(z.object({ phone: z.string().min(8) }))
@@ -248,7 +276,7 @@ export const authRouter = createTRPCRouter({
         name: true,
         phone: true,
         role: true,
-        avatarUrl: true,
+        image: true,
         locationRegion: true,
         locationCity: true,
         languagePref: true,

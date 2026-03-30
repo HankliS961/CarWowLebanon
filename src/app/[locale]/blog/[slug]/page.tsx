@@ -151,9 +151,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           {/* Author & Meta */}
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              {post.author.avatarUrl ? (
+              {post.author.image ? (
                 <Image
-                  src={post.author.avatarUrl}
+                  src={post.author.image}
                   alt={post.author.name || ""}
                   width={32}
                   height={32}
@@ -211,9 +211,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               {/* Author Bio */}
               <div className="mt-8 rounded-lg border bg-card p-6">
                 <div className="flex items-start gap-4">
-                  {post.author.avatarUrl ? (
+                  {post.author.image ? (
                     <Image
-                      src={post.author.avatarUrl}
+                      src={post.author.image}
                       alt={post.author.name || ""}
                       width={64}
                       height={64}
@@ -287,7 +287,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   publishedAt={rp.publishedAt?.toISOString() || null}
                   author={{
                     name: rp.author.name,
-                    avatarUrl: rp.author.avatarUrl,
+                    image: rp.author.image,
                   }}
                 />
               ))}
