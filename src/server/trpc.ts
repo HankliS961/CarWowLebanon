@@ -118,18 +118,58 @@ export const adminProcedure = t.procedure
   .use(enforceAdmin);
 
 /**
- * Middleware that enforces dealer role.
+ * Middleware that enforces dealer role, active status, and valid subscription.
+ * Admin users bypass the dealer status check and get a synthetic GOLD-tier context.
  */
-const enforceDealer = t.middleware(({ ctx, next }) => {
+const enforceDealer = t.middleware(async ({ ctx, next }) => {
   if (!ctx.session?.user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
   if (ctx.session.user.role !== "DEALER" && ctx.session.user.role !== "ADMIN") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Dealer access required" });
   }
+
+  // Admin users bypass dealer status checks
+  if (ctx.session.user.role === "ADMIN") {
+    return next({
+      ctx: {
+        session: ctx.session as Session & { user: NonNullable<Session["user"]> },
+        dealer: { status: "ACTIVE" as const, subscriptionTier: "GOLD" as const },
+      },
+    });
+  }
+
+  // Dealer users: verify active status and subscription
+  const dealer = await ctx.prisma.dealer.findUnique({
+    where: { userId: ctx.session.user.id },
+    select: { status: true, subscriptionTier: true, subscriptionExpiresAt: true },
+  });
+
+  if (!dealer) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Dealer profile not found" });
+  }
+
+  if (dealer.status === "PENDING") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Your dealer account is pending admin approval" });
+  }
+
+  if (dealer.status === "SUSPENDED") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Your dealer account has been suspended" });
+  }
+
+  // Check subscription expiration — downgrade to FREE if expired
+  if (dealer.subscriptionExpiresAt && dealer.subscriptionExpiresAt < new Date() && dealer.subscriptionTier !== "FREE") {
+    await ctx.prisma.dealer.update({
+      where: { userId: ctx.session.user.id },
+      data: { subscriptionTier: "FREE", subscriptionExpiresAt: null },
+    });
+    dealer.subscriptionTier = "FREE" as any;
+  }
+
   return next({
     ctx: {
       session: ctx.session as Session & { user: NonNullable<Session["user"]> },
+      dealer: { status: dealer.status, subscriptionTier: dealer.subscriptionTier },
     },
   });
 });

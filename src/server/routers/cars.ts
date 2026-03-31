@@ -5,6 +5,7 @@ import { notifyPriceDrop } from "@/lib/notifications/create";
 import { sendPriceDropEmail } from "@/lib/notifications/email";
 import { indexCar, removeCar, searchCars } from "@/lib/meilisearch";
 import { logDealerListingCreated, logDealerListingSold } from "@/lib/market-data/log-price";
+import { TIER_LIMITS } from "@/lib/constants";
 
 /** Cars router — CRUD operations for car listings. */
 export const carsRouter = createTRPCRouter({
@@ -242,10 +243,28 @@ export const carsRouter = createTRPCRouter({
 
       const dealer = await ctx.prisma.dealer.findUnique({
         where: { userId: ctx.session.user.id },
+        select: {
+          id: true,
+          subscriptionTier: true,
+          _count: {
+            select: {
+              cars: { where: { status: { in: ["ACTIVE", "DRAFT"] } } },
+            },
+          },
+        },
       });
 
       if (!dealer) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
+      }
+
+      // Enforce listing limit based on subscription tier
+      const limits = TIER_LIMITS[dealer.subscriptionTier as keyof typeof TIER_LIMITS];
+      if (dealer._count.cars >= limits.maxListings) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `You've reached your ${limits.maxListings} listing limit. Upgrade your plan to add more listings.`,
+        });
       }
 
       const car = await ctx.prisma.car.create({

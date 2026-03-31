@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, adminProcedure, publicProcedure } from "../trpc";
-import { UserRole, ContentStatus } from "@prisma/client";
+import { UserRole, ContentStatus, SubscriptionTier } from "@prisma/client";
 import { deleteFromR2 } from "@/lib/r2";
 import { createNotification } from "@/lib/notifications/create";
 
@@ -550,6 +550,42 @@ export const adminRouter = createTRPCRouter({
         where: { category: input.category },
         orderBy: { sortOrder: "asc" },
       });
+    }),
+
+  /** Set a dealer's subscription tier and expiration (admin-managed). */
+  setDealerTier: adminProcedure
+    .input(
+      z.object({
+        dealerId: z.string().uuid(),
+        tier: z.enum(["FREE", "BRONZE", "SILVER", "GOLD"]),
+        expiresAt: z.string().optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const dealer = await ctx.prisma.dealer.findUnique({ where: { id: input.dealerId } });
+      if (!dealer) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Dealer not found" });
+      }
+
+      await ctx.prisma.dealer.update({
+        where: { id: input.dealerId },
+        data: {
+          subscriptionTier: input.tier,
+          subscriptionExpiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        },
+      });
+
+      await ctx.prisma.adminLog.create({
+        data: {
+          adminId: ctx.session.user.id,
+          action: "SET_DEALER_TIER",
+          targetType: "Dealer",
+          targetId: input.dealerId,
+          details: { tier: input.tier, expiresAt: input.expiresAt ?? null, previousTier: dealer.subscriptionTier },
+        },
+      });
+
+      return { success: true };
     }),
 
   /** Get market data collection statistics for analytics dashboard. */

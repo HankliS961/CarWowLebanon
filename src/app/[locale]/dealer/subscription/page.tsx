@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Check, X, CreditCard, Loader2 } from "lucide-react";
+import { Check, X, CreditCard, Loader2, AlertCircle, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,9 +29,39 @@ export default function DealerSubscriptionPage() {
     retry: false,
   });
 
+  // Fetch active listing count (contributes to quota)
+  const { data: activeListings } = trpc.cars.listForDealer.useQuery(
+    { page: 1, limit: 1, status: "ACTIVE" },
+    { enabled: !!dealer }
+  );
+
+  // Fetch draft listing count (also contributes to quota)
+  const { data: draftListings } = trpc.cars.listForDealer.useQuery(
+    { page: 1, limit: 1, status: "DRAFT" },
+    { enabled: !!dealer }
+  );
+
   const currentTier: SubscriptionTier = (dealer?.subscriptionTier as SubscriptionTier) ?? "FREE";
+  const currentLimits = TIER_LIMITS[currentTier];
+  const usedListings = (activeListings?.total ?? 0) + (draftListings?.total ?? 0);
+  const maxListings = currentLimits.maxListings;
+  const isUnlimited = maxListings === 9999;
+  const usagePercent = isUnlimited ? 0 : Math.min((usedListings / maxListings) * 100, 100);
+  const isNearLimit = !isUnlimited && usagePercent >= 80;
+  const isAtLimit = !isUnlimited && usedListings >= maxListings;
+
+  const expiresAt = dealer?.subscriptionExpiresAt
+    ? new Date(dealer.subscriptionExpiresAt)
+    : null;
+  const isExpiringSoon = useMemo(() => {
+    if (!expiresAt) return false;
+    const daysUntil = (expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return daysUntil <= 7 && daysUntil > 0;
+  }, [expiresAt]);
 
   const tiers: SubscriptionTier[] = ["FREE", "BRONZE", "SILVER", "GOLD"];
+  const tierOrder: Record<SubscriptionTier, number> = { FREE: 0, BRONZE: 1, SILVER: 2, GOLD: 3 };
+  const upgradeTiers = tiers.filter((t) => tierOrder[t] > tierOrder[currentTier]);
   const tierNames: Record<SubscriptionTier, string> = {
     FREE: t("tiers.free"),
     BRONZE: t("tiers.bronze"),
@@ -77,7 +108,7 @@ export default function DealerSubscriptionPage() {
   ];
 
   const handleUpgrade = (tier: SubscriptionTier) => {
-    toast.info(`To upgrade to ${tierNames[tier]}, please contact us at support@carsouk.com`);
+    toast.info("Contact your account manager or admin to upgrade your subscription.");
   };
 
   if (isLoading) {
@@ -94,19 +125,106 @@ export default function DealerSubscriptionPage() {
 
       {/* Current plan */}
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-primary/10 p-3">
-              <CreditCard className="h-6 w-6 text-primary" />
+        <CardContent className="space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="rounded-lg bg-primary/10 p-3">
+                <CreditCard className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">{t("currentPlan")}</p>
+                <p className="text-lg font-bold">{tierNames[currentTier]}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t("currentPlan")}</p>
-              <p className="text-lg font-bold">{tierNames[currentTier]}</p>
+            <Badge className={cn("text-sm", tierColors[currentTier])}>
+              {currentTier === "FREE" ? "Free Forever" : `$${TIER_LIMITS[currentTier as SubscriptionTier].pricePerMonth}${t("perMonth")}`}
+            </Badge>
+          </div>
+
+          {/* Subscription expiration */}
+          {expiresAt && (
+            <div className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+              isExpiringSoon
+                ? "bg-amber-50 text-amber-800"
+                : "bg-muted/50 text-muted-foreground"
+            )}>
+              <CalendarClock className="h-4 w-4 shrink-0" />
+              <span>
+                {isExpiringSoon ? "Expiring soon: " : "Expires: "}
+                {expiresAt.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+              </span>
+            </div>
+          )}
+
+          {/* Usage indicators */}
+          <div className="space-y-3">
+            {/* Listings usage */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Listings</span>
+                <span className={cn(
+                  "tabular-nums",
+                  isAtLimit ? "font-semibold text-red-600" : isNearLimit ? "text-amber-600" : "text-muted-foreground"
+                )}>
+                  {usedListings} / {isUnlimited ? "Unlimited" : maxListings} used
+                </span>
+              </div>
+              {!isUnlimited && (
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      isAtLimit
+                        ? "bg-red-500"
+                        : isNearLimit
+                          ? "bg-amber-500"
+                          : "bg-primary"
+                    )}
+                    style={{ width: `${usagePercent}%` }}
+                  />
+                </div>
+              )}
+              {isAtLimit && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  You have reached your listing limit. Upgrade your plan to add more.
+                </p>
+              )}
+            </div>
+
+            {/* Feature summary for current tier */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 border-t pt-3 text-sm sm:grid-cols-4">
+              <div className="flex items-center gap-1.5">
+                {currentLimits.reverseMarketplace ? (
+                  <Check className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <X className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className={cn(!currentLimits.reverseMarketplace && "text-muted-foreground")}>
+                  Reverse Marketplace
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {currentLimits.analytics ? (
+                  <Check className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <X className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className={cn(!currentLimits.analytics && "text-muted-foreground")}>
+                  Advanced Analytics
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Featured:</span>
+                <span className="font-medium">{currentLimits.featuredListings}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Team:</span>
+                <span className="font-medium">{currentLimits.teamMembers} members</span>
+              </div>
             </div>
           </div>
-          <Badge className={cn("text-sm", tierColors[currentTier])}>
-            {currentTier === "FREE" ? "Free Forever" : `$${TIER_LIMITS[currentTier as SubscriptionTier].pricePerMonth}${t("perMonth")}`}
-          </Badge>
         </CardContent>
       </Card>
 
@@ -163,60 +281,65 @@ export default function DealerSubscriptionPage() {
         </CardContent>
       </Card>
 
-      {/* Tier cards for upgrade */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {tiers.map((tier) => {
-          const isCurrent = tier === currentTier;
-          const limits = TIER_LIMITS[tier];
-          return (
-            <Card
-              key={tier}
-              className={cn(
-                "relative",
-                isCurrent && "border-primary ring-1 ring-primary"
-              )}
-            >
-              {isCurrent && (
-                <Badge className="absolute -top-2.5 left-4 bg-primary">
-                  Current
-                </Badge>
-              )}
-              <CardHeader className="pb-3">
-                <CardTitle className="text-center text-lg">
-                  {tierNames[tier]}
-                </CardTitle>
-                <p className="text-center text-2xl font-bold">
-                  {limits.pricePerMonth === 0
-                    ? "Free"
-                    : `$${limits.pricePerMonth}`}
-                  {limits.pricePerMonth > 0 && (
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {t("perMonth")}
-                    </span>
-                  )}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p>{limits.maxListings === 9999 ? "Unlimited" : limits.maxListings} listings</p>
-                <p>{limits.teamMembers} team members</p>
-                <p>{limits.featuredListings} featured listings</p>
-                {limits.reverseMarketplace && <p>Reverse marketplace access</p>}
-                {limits.analytics && <p>Advanced analytics</p>}
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent}
-                  onClick={() => !isCurrent && handleUpgrade(tier)}
-                >
-                  {isCurrent ? "Current Plan" : t("upgrade")}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Upgrade options — only tiers higher than current */}
+      {upgradeTiers.length > 0 && (
+        <div>
+          <h2 className="mb-4 text-lg font-semibold">{t("upgrade")}</h2>
+          <div className={cn(
+            "grid gap-4",
+            upgradeTiers.length === 1 && "max-w-md",
+            upgradeTiers.length === 2 && "sm:grid-cols-2 max-w-2xl",
+            upgradeTiers.length >= 3 && "sm:grid-cols-2 lg:grid-cols-3",
+          )}>
+            {upgradeTiers.map((tier) => {
+              const limits = TIER_LIMITS[tier];
+              const currentPrice = TIER_LIMITS[currentTier].pricePerMonth;
+              const diff = limits.pricePerMonth - currentPrice;
+              return (
+                <Card key={tier} className="relative border-primary/30">
+                  <CardHeader className="pb-3">
+                    <Badge className={cn("mx-auto mb-2 text-xs", tierColors[tier])}>
+                      {tierNames[tier]}
+                    </Badge>
+                    <p className="text-center text-2xl font-bold">
+                      ${limits.pricePerMonth}
+                      <span className="text-sm font-normal text-muted-foreground">{t("perMonth")}</span>
+                    </p>
+                    {diff > 0 && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        +${diff}/mo from your current plan
+                      </p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{limits.maxListings === 9999 ? "Unlimited" : limits.maxListings} listings</p>
+                    <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{limits.featuredListings} featured listings</p>
+                    <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{limits.teamMembers} team members</p>
+                    {limits.reverseMarketplace && <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />Reverse marketplace</p>}
+                    {limits.analytics && <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />Advanced analytics</p>}
+                  </CardContent>
+                  <CardFooter>
+                    <Button className="w-full" onClick={() => handleUpgrade(tier)}>
+                      {t("upgrade")} to {tierNames[tier]}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {currentTier === "GOLD" && (
+        <Card className="border-yellow-300 bg-yellow-50/50">
+          <CardContent className="flex items-center gap-3 p-6">
+            <CreditCard className="h-6 w-6 text-yellow-600" />
+            <p className="text-sm font-medium text-yellow-800">
+              You&apos;re on the Gold plan — the highest tier. You have access to all features.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Billing History */}
       <Card>

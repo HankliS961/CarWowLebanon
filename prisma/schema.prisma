@@ -309,8 +309,10 @@ model Dealer {
   city                  String
   lat                   Decimal?         @db.Decimal(10, 7)
   lng                   Decimal?         @db.Decimal(10, 7)
+  googleMapsUrl         String?
   phone                 String
   whatsappNumber        String?
+  whatsappGreeting      String?
   email                 String
   websiteUrl            String?
   instagramUrl          String?

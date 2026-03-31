@@ -60,7 +60,7 @@ export function DealerCard({ dealer, className }: DealerCardProps) {
       {/* Rating */}
       <div className="mt-2 flex items-center gap-1 text-sm">
         <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-        <span className="font-semibold">{dealer.ratingAvg.toFixed(1)}</span>
+        <span className="font-semibold">{Number(dealer.ratingAvg).toFixed(1)}</span>
         <span className="text-muted-foreground">({dealer.reviewCount})</span>
       </div>
 

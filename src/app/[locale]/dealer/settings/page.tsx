@@ -39,6 +39,9 @@ interface SettingsForm {
   email: string;
   website: string;
   instagram: string;
+  googleMapsUrl: string;
+  brandsCarried: string;
+  whatsappGreeting: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -103,6 +106,9 @@ export default function DealerSettingsPage() {
         email: dealer.email ?? "",
         website: dealer.websiteUrl ?? "",
         instagram: dealer.instagramUrl ?? "",
+        googleMapsUrl: dealer.googleMapsUrl ?? "",
+        brandsCarried: Array.isArray(dealer.brandsCarried) ? (dealer.brandsCarried as string[]).join(", ") : "",
+        whatsappGreeting: (dealer as any).whatsappGreeting ?? "",
       });
 
       // Load working hours from dealer profile if present
@@ -205,6 +211,11 @@ export default function DealerSettingsPage() {
       whatsappNumber: data.whatsapp || undefined,
       websiteUrl: data.website || undefined,
       instagramUrl: data.instagram || undefined,
+      googleMapsUrl: data.googleMapsUrl || undefined,
+      brandsCarried: data.brandsCarried
+        ? data.brandsCarried.split(",").map((b: string) => b.trim()).filter(Boolean)
+        : undefined,
+      whatsappGreeting: data.whatsappGreeting || undefined,
       workingHours: workingHours,
       logoUrl: logoUrl || undefined,
       coverImageUrl: coverImageUrl || undefined,
@@ -271,6 +282,17 @@ export default function DealerSettingsPage() {
               <Label htmlFor="city">City</Label>
               <Input id="city" {...register("city")} />
             </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="brandsCarried">Brands Carried</Label>
+              <Input
+                id="brandsCarried"
+                {...register("brandsCarried")}
+                placeholder="Toyota, BMW, Mercedes, Honda..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Separate brand names with commas. These will be shown on your profile.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -288,6 +310,17 @@ export default function DealerSettingsPage() {
               <Label htmlFor="whatsapp">WhatsApp Number</Label>
               <Input id="whatsapp" {...register("whatsapp")} placeholder="+961 XX XXX XXX" />
             </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="whatsappGreeting">WhatsApp Greeting Message</Label>
+              <Input
+                id="whatsappGreeting"
+                {...register("whatsappGreeting")}
+                placeholder="Hi, I saw your listing on CarSouk..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom message visitors will send when they click your WhatsApp button
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...register("email")} />
@@ -299,6 +332,17 @@ export default function DealerSettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="instagram">Instagram</Label>
               <Input id="instagram" {...register("instagram")} placeholder="@yourhandle" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="googleMapsUrl">Google Maps Link</Label>
+              <Input
+                id="googleMapsUrl"
+                {...register("googleMapsUrl")}
+                placeholder="https://maps.google.com/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste your Google Maps location link so visitors can find you easily
+              </p>
             </div>
           </CardContent>
         </Card>

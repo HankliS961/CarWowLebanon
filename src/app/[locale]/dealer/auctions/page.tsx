@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { useRouter } from "@/i18n/routing";
 import Image from "next/image";
 import {
   Gavel,
@@ -60,6 +61,8 @@ interface ActiveListing {
 /** Available sell listings where dealers can place bids to buy cars. */
 export default function DealerAuctionsPage() {
   const t = useTranslations("dealer.auctions");
+  const locale = useLocale();
+  const router = useRouter();
   const [bidListingId, setBidListingId] = useState<string | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [bidNotes, setBidNotes] = useState("");
@@ -83,7 +86,17 @@ export default function DealerAuctionsPage() {
       setBidNotes("");
     },
     onError: (error) => {
-      toast.error(error.message);
+      if (error.data?.code === "FORBIDDEN" && error.message.includes("Upgrade")) {
+        toast.error(error.message, {
+          action: {
+            label: "Upgrade",
+            onClick: () => router.push("/dealer/subscription"),
+          },
+          duration: 8000,
+        });
+      } else {
+        toast.error(error.message);
+      }
     },
   });
 

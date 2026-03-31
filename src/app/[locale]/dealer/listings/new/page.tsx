@@ -63,7 +63,17 @@ export default function NewListingPage() {
       router.push(`/${locale}/dealer/listings`);
     },
     onError: (error) => {
-      toast.error(error.message);
+      if (error.data?.code === "FORBIDDEN" && error.message.includes("listing limit")) {
+        toast.error(error.message, {
+          action: {
+            label: "Upgrade",
+            onClick: () => router.push(`/${locale}/dealer/subscription`),
+          },
+          duration: 8000,
+        });
+      } else {
+        toast.error(error.message);
+      }
     },
   });
 

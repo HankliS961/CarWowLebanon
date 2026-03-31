@@ -131,15 +131,18 @@ export const dealersRouter = createTRPCRouter({
         phone: z.string().min(8).optional(),
         email: z.string().email().optional(),
         whatsappNumber: z.string().optional(),
+        whatsappGreeting: z.string().optional().nullable(),
         websiteUrl: z.string().optional(),
+        brandsCarried: z.array(z.string()).optional(),
         instagramUrl: z.string().optional(),
+        googleMapsUrl: z.string().url().optional().nullable(),
         workingHours: z.any().optional(),
         logoUrl: z.string().optional(),
         coverImageUrl: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { workingHours, logoUrl, coverImageUrl, ...rest } = input;
+      const { workingHours, logoUrl, coverImageUrl, brandsCarried, ...rest } = input;
       return ctx.prisma.dealer.update({
         where: { userId: ctx.session.user.id },
         data: {
@@ -147,6 +150,7 @@ export const dealersRouter = createTRPCRouter({
           ...(workingHours !== undefined && { workingHours }),
           ...(logoUrl !== undefined && { logoUrl }),
           ...(coverImageUrl !== undefined && { coverImageUrl }),
+          ...(brandsCarried !== undefined && { brandsCarried }),
         },
       });
     }),

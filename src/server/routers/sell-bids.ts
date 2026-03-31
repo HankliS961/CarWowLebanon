@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure, dealerProcedure } from "../trpc";
 import { notifyNewBid, notifyBidAccepted } from "@/lib/notifications/create";
 import { sendNewBidEmail, sendBidAcceptedEmail } from "@/lib/notifications/email";
 import { logSellListingAccepted } from "@/lib/market-data/log-price";
+import { TIER_LIMITS } from "@/lib/constants";
 
 /** Sell Bids router — dealer bids on sell listings. */
 export const sellBidsRouter = createTRPCRouter({
@@ -19,8 +20,18 @@ export const sellBidsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const dealer = await ctx.prisma.dealer.findUnique({
         where: { userId: ctx.session.user.id },
+        select: { id: true, companyName: true, userId: true, subscriptionTier: true },
       });
       if (!dealer) throw new TRPCError({ code: "NOT_FOUND", message: "Dealer profile not found" });
+
+      // Gate reverse marketplace to BRONZE+ tiers
+      const limits = TIER_LIMITS[dealer.subscriptionTier as keyof typeof TIER_LIMITS];
+      if (!limits.reverseMarketplace) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Placing bids requires a Bronze plan or higher. Upgrade to start bidding on cars.",
+        });
+      }
 
       // Validate the listing is still live
       const listing = await ctx.prisma.sellListing.findUnique({

@@ -51,9 +51,11 @@ prisma/
   seed.ts                 # Test data seeder
 ```
 
-## Agent System (7 Layer-Based Agents)
+## Agent System (9 Agents)
 
-Agents are in `.claude/agents/`. Each owns specific files with zero overlap.
+Agents are in `.claude/agents/`. Layer-based agents own specific files with zero overlap. Cross-cutting agents operate across layers.
+
+### Layer Agents (file ownership)
 
 | Agent | Owns | Does NOT Touch |
 |-------|------|----------------|
@@ -64,6 +66,13 @@ Agents are in `.claude/agents/`. Each owns specific files with zero overlap.
 | **marketplace-frontend** | `src/app/[locale]/cars/`, `/dealers/`, `/get-offers/`, `/[make]/`, homepage, `src/components/cars/`, `src/components/dealers/` | Portals, backend |
 | **portal-frontend** | `src/app/[locale]/dealer/`, `/admin/`, `/dashboard/`, `/sell-my-car/`, `src/components/dealer/`, `src/components/admin/` | Marketplace pages, backend |
 | **content-seo** | `src/app/[locale]/blog/`, `/reviews/`, `/guides/`, `/tools/`, `/about/`, `/legal/`, `src/i18n/`, `src/lib/seo/`, `src/components/seo/` | Other pages, backend |
+
+### Cross-Cutting Agents (domain expertise, read everything)
+
+| Agent | Purpose | Key Files |
+|-------|---------|-----------|
+| **quality-guard** | Catches TS errors, Prisma type mismatches (Decimal fields), dead references, runtime bugs. Run proactively after changes. | Reads all `src/`, `prisma/` |
+| **subscription-payments** | Tier management, feature gating, Stripe integration, upgrade flows, billing. Owns the commercial layer. | `src/lib/constants.ts`, `src/app/[locale]/dealer/subscription/`, enforcement in routers |
 
 ## Key Conventions
 
