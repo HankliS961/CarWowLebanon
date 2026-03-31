@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure, dealerProcedure } from "../trpc";
-import { notifyPriceDrop } from "@/lib/notifications/create";
+import { notifyPriceDrop, notifyCarRequestMatch } from "@/lib/notifications/create";
 import { sendPriceDropEmail } from "@/lib/notifications/email";
 import { indexCar, removeCar, searchCars } from "@/lib/meilisearch";
 import { logDealerListingCreated, logDealerListingSold } from "@/lib/market-data/log-price";
@@ -292,6 +292,44 @@ export const carsRouter = createTRPCRouter({
           region: input.locationRegion,
           carListingId: car.id,
         }).catch(console.error);
+      }
+
+      // Fire-and-forget: auto-match buyer car requests
+      if (car.status === "ACTIVE") {
+        (async () => {
+          try {
+            const matchingRequests = await ctx.prisma.carRequest.findMany({
+              where: {
+                status: "ACTIVE",
+                expiresAt: { gt: new Date() },
+                make: { equals: rest.make, mode: "insensitive" },
+                model: { equals: rest.model, mode: "insensitive" },
+                yearFrom: { lte: rest.year },
+                yearTo: { gte: rest.year },
+              },
+              select: { id: true, buyerId: true, make: true, model: true },
+            });
+
+            if (matchingRequests.length > 0) {
+              const dealerInfo = await ctx.prisma.dealer.findUnique({
+                where: { id: dealer.id },
+                select: { companyName: true },
+              });
+
+              for (const req of matchingRequests) {
+                notifyCarRequestMatch({
+                  buyerId: req.buyerId,
+                  dealerName: dealerInfo?.companyName ?? "A dealer",
+                  make: req.make,
+                  model: req.model,
+                  carId: car.id,
+                }).catch(console.error);
+              }
+            }
+          } catch (e) {
+            console.error("[CarRequest Match]", e);
+          }
+        })();
       }
 
       return car;

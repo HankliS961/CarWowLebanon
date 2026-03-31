@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, Region, Language, CarCondition, CarSource, BodyType, FuelType, Transmission, Drivetrain, ListingStatus, ContentStatus, BlogCategory, DealerStatus } from "@prisma/client";
+import { PrismaClient, UserRole, Region, Language, CarCondition, CarSource, BodyType, FuelType, Transmission, Drivetrain, ListingStatus, ContentStatus, BlogCategory, DealerStatus, SubscriptionTier } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -345,6 +345,126 @@ async function main() {
       },
     },
   });
+
+  // --- Bronze Dealer ---
+  const dealerUser3 = await prisma.user.upsert({
+    where: { email: "north.auto@example.com" },
+    update: {},
+    create: {
+      email: "north.auto@example.com",
+      name: "Hassan Mourad",
+      passwordHash: dealerPassword,
+      role: UserRole.DEALER,
+      isVerified: true,
+      locationRegion: Region.NORTH,
+      languagePref: Language.AR,
+    },
+  });
+
+  const dealer3 = await prisma.dealer.upsert({
+    where: { userId: dealerUser3.id },
+    update: {},
+    create: {
+      userId: dealerUser3.id,
+      companyName: "North Star Motors",
+      companyNameAr: "نجمة الشمال للسيارات",
+      slug: "north-star-motors",
+      descriptionEn: "Tripoli's trusted dealership for affordable new and used vehicles. Bronze partner with access to buyer requests and reverse marketplace.",
+      descriptionAr: "وكالة طرابلس الموثوقة للسيارات الجديدة والمستعملة بأسعار مناسبة.",
+      region: Region.NORTH,
+      city: "Tripoli",
+      phone: "+961-6-111222",
+      whatsappNumber: "9616111222",
+      email: "info@northstarmotors.com",
+      address: "Mina Road, Tripoli",
+      isVerified: true,
+      status: DealerStatus.ACTIVE,
+      subscriptionTier: SubscriptionTier.BRONZE,
+      subscriptionExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      brandsCarried: ["Toyota", "Kia", "Hyundai", "Suzuki"],
+    },
+  });
+  console.log(`  Bronze dealer: ${dealerUser3.email} (${dealer3.companyName})`);
+
+  // --- Silver Dealer ---
+  const dealerUser4 = await prisma.user.upsert({
+    where: { email: "south.motors@example.com" },
+    update: {},
+    create: {
+      email: "south.motors@example.com",
+      name: "Ali Hammoud",
+      passwordHash: dealerPassword,
+      role: UserRole.DEALER,
+      isVerified: true,
+      locationRegion: Region.SOUTH,
+      languagePref: Language.AR,
+    },
+  });
+
+  const dealer4 = await prisma.dealer.upsert({
+    where: { userId: dealerUser4.id },
+    update: {},
+    create: {
+      userId: dealerUser4.id,
+      companyName: "South Lebanon Auto Gallery",
+      companyNameAr: "معرض جنوب لبنان للسيارات",
+      slug: "south-lebanon-auto-gallery",
+      descriptionEn: "Leading dealership in Sidon with full analytics dashboard and premium features. Silver partner serving the South region.",
+      descriptionAr: "الوكالة الرائدة في صيدا مع لوحة تحليلات كاملة وميزات متقدمة.",
+      region: Region.SOUTH,
+      city: "Sidon",
+      phone: "+961-7-333444",
+      whatsappNumber: "9617333444",
+      email: "info@southlebanonauto.com",
+      address: "Saida Highway, South Lebanon",
+      isVerified: true,
+      status: DealerStatus.ACTIVE,
+      subscriptionTier: SubscriptionTier.SILVER,
+      subscriptionExpiresAt: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+      brandsCarried: ["Mercedes-Benz", "BMW", "Honda", "Nissan", "Mazda"],
+    },
+  });
+  console.log(`  Silver dealer: ${dealerUser4.email} (${dealer4.companyName})`);
+
+  // --- Gold Dealer ---
+  const dealerUser5 = await prisma.user.upsert({
+    where: { email: "bekaa.luxury@example.com" },
+    update: {},
+    create: {
+      email: "bekaa.luxury@example.com",
+      name: "Karim Fares",
+      passwordHash: dealerPassword,
+      role: UserRole.DEALER,
+      isVerified: true,
+      locationRegion: Region.BEKAA,
+      languagePref: Language.AR,
+    },
+  });
+
+  const dealer5 = await prisma.dealer.upsert({
+    where: { userId: dealerUser5.id },
+    update: {},
+    create: {
+      userId: dealerUser5.id,
+      companyName: "Bekaa Luxury Cars",
+      companyNameAr: "سيارات البقاع الفاخرة",
+      slug: "bekaa-luxury-cars",
+      descriptionEn: "Bekaa Valley's premier luxury dealership. Gold partner with unlimited listings, full team management, and all premium features unlocked.",
+      descriptionAr: "وكالة البقاع الفاخرة الأولى. شريك ذهبي مع إعلانات غير محدودة وجميع الميزات المتقدمة.",
+      region: Region.BEKAA,
+      city: "Zahle",
+      phone: "+961-8-555666",
+      whatsappNumber: "9618555666",
+      email: "info@bekaacars.com",
+      address: "Boulevard Street, Zahle",
+      isVerified: true,
+      status: DealerStatus.ACTIVE,
+      subscriptionTier: SubscriptionTier.GOLD,
+      subscriptionExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      brandsCarried: ["Porsche", "Land Rover", "Mercedes-Benz", "BMW", "Audi", "Lexus", "Genesis"],
+    },
+  });
+  console.log(`  Gold dealer: ${dealerUser5.email} (${dealer5.companyName})`);
 
   // --- Buyer Users ---
   console.log("Seeding buyer users...");

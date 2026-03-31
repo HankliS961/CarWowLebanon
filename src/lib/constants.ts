@@ -179,6 +179,7 @@ export const TIER_LIMITS: Record<
     analytics: boolean;
     featuredListings: number;
     teamMembers: number;
+    buyerRequests: boolean;
     pricePerMonth: number;
   }
 > = {
@@ -188,6 +189,7 @@ export const TIER_LIMITS: Record<
     analytics: false,
     featuredListings: 0,
     teamMembers: 1,
+    buyerRequests: false,
     pricePerMonth: 0,
   },
   BRONZE: {
@@ -196,6 +198,7 @@ export const TIER_LIMITS: Record<
     analytics: false,
     featuredListings: 2,
     teamMembers: 3,
+    buyerRequests: true,
     pricePerMonth: 49,
   },
   SILVER: {
@@ -204,6 +207,7 @@ export const TIER_LIMITS: Record<
     analytics: true,
     featuredListings: 5,
     teamMembers: 5,
+    buyerRequests: true,
     pricePerMonth: 99,
   },
   GOLD: {
@@ -212,9 +216,21 @@ export const TIER_LIMITS: Record<
     analytics: true,
     featuredListings: 20,
     teamMembers: 15,
+    buyerRequests: true,
     pricePerMonth: 199,
   },
 };
+
+/** Max active car requests per buyer. */
+export const BUYER_REQUEST_LIMITS: Record<string, number> = {
+  FREE: 1,
+  BRONZE: 3,
+  SILVER: 5,
+  GOLD: 10,
+};
+
+/** Default car request duration in days (admin-adjustable). */
+export const DEFAULT_REQUEST_DURATION_DAYS = 7;
 
 // =============================================================================
 // CAR FEATURES LIST

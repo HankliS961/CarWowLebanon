@@ -27,6 +27,10 @@ export function getNotificationHref(
       return isDealer ? "/dealer/reviews" : "/dashboard";
     case "LISTING_MATCH":
       return "/cars";
+    case "NEW_CAR_REQUEST":
+      return role === "ADMIN" ? "/admin/car-requests" : isDealer ? "/dealer/requests" : "/dashboard/requests";
+    case "CAR_REQUEST_MATCH":
+      return data?.carId ? `/cars/${data.carId}` : "/dashboard/requests";
     default:
       return "/dashboard";
   }

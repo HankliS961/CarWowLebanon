@@ -16,6 +16,7 @@ import { carMakesRouter } from "./car-makes";
 import { toolsRouter } from "./tools";
 import { contentRouter } from "./content";
 import { compareRouter } from "./compare";
+import { carRequestsRouter } from "./car-requests";
 
 /**
  * Root tRPC router for CarSouk.
@@ -23,6 +24,7 @@ import { compareRouter } from "./compare";
  */
 export const appRouter = createTRPCRouter({
   auth: authRouter,
+  carRequests: carRequestsRouter,
   cars: carsRouter,
   compare: compareRouter,
   dealers: dealersRouter,

@@ -210,6 +210,70 @@ export async function notifyNewAuction({
 }
 
 /**
+ * Notify buyer that a new dealer listing matches their car request.
+ */
+export async function notifyCarRequestMatch({
+  buyerId,
+  dealerName,
+  make,
+  model,
+  carId,
+}: {
+  buyerId: string;
+  dealerName: string;
+  make: string;
+  model: string;
+  carId?: string;
+}) {
+  return createNotification({
+    userId: buyerId,
+    type: "CAR_REQUEST_MATCH",
+    title: `${dealerName} has the car you're looking for!`,
+    body: `${dealerName} responded to your request for a ${make} ${model}.`,
+    data: { dealerName, make, model, carId },
+  });
+}
+
+/**
+ * Notify all verified BRONZE+ dealers about a new buyer car request.
+ * Uses createMany for bulk efficiency.
+ */
+export async function notifyNewCarRequest({
+  make,
+  model,
+  yearFrom,
+  yearTo,
+}: {
+  make: string;
+  model: string;
+  yearFrom: number;
+  yearTo: number;
+}) {
+  const dealers = await prisma.dealer.findMany({
+    where: {
+      isVerified: true,
+      subscriptionTier: { in: ["BRONZE", "SILVER", "GOLD"] },
+    },
+    select: { userId: true },
+  });
+
+  if (dealers.length === 0) return;
+
+  const yearRange = yearFrom === yearTo ? `${yearFrom}` : `${yearFrom}-${yearTo}`;
+  const carDesc = `${yearRange} ${make} ${model}`;
+
+  await prisma.notification.createMany({
+    data: dealers.map((d) => ({
+      userId: d.userId,
+      type: "NEW_CAR_REQUEST" as const,
+      title: `Someone is looking for a ${carDesc}`,
+      body: `A buyer in the market is searching for a ${carDesc}. If you have one or can source it, check Buyer Requests to respond.`,
+      data: { make, model, yearFrom, yearTo },
+    })),
+  });
+}
+
+/**
  * Notify dealer about a new review.
  */
 export async function notifyReviewReceived({

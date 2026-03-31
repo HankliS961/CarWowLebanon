@@ -7,6 +7,8 @@ export {
   notifyPriceDrop,
   notifyListingMatch,
   notifyReviewReceived,
+  notifyNewCarRequest,
+  notifyCarRequestMatch,
 } from "./create";
 
 export {

@@ -26,7 +26,7 @@ export default function DealerLayout({
 
   return (
     <RoleGate allowedRoles={["DEALER", "ADMIN"]}>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-[calc(100vh-6rem)] overflow-hidden">
         <DealerSidebar
           locale={locale}
           open={sidebarOpen}

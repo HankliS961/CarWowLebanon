@@ -3,7 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, adminProcedure, publicProcedure } from "../trpc";
 import { UserRole, ContentStatus, SubscriptionTier } from "@prisma/client";
 import { deleteFromR2 } from "@/lib/r2";
-import { createNotification } from "@/lib/notifications/create";
+import { createNotification, notifyNewCarRequest } from "@/lib/notifications/create";
+import { whatsappCarRequestApproved } from "@/lib/notifications/whatsapp";
 
 /** Admin router — platform administration. */
 export const adminRouter = createTRPCRouter({
@@ -582,6 +583,118 @@ export const adminRouter = createTRPCRouter({
           targetType: "Dealer",
           targetId: input.dealerId,
           details: { tier: input.tier, expiresAt: input.expiresAt ?? null, previousTier: dealer.subscriptionTier },
+        },
+      });
+
+      return { success: true };
+    }),
+
+  // =========================================================================
+  // CAR REQUESTS (admin approval flow)
+  // =========================================================================
+
+  /** List car requests pending admin review. */
+  listCarRequestsPending: adminProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.carRequest.findMany({
+      where: { status: "PENDING_REVIEW" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        buyer: { select: { name: true, email: true, phone: true } },
+      },
+    });
+  }),
+
+  /** Approve a car request — sets it to ACTIVE and notifies dealers. */
+  approveCarRequest: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const request = await ctx.prisma.carRequest.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!request || request.status !== "PENDING_REVIEW") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Request not found or already processed",
+        });
+      }
+
+      // Set expiresAt from NOW (not from when buyer created it)
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const updatedRequest = await ctx.prisma.carRequest.update({
+        where: { id: input.id },
+        data: { status: "ACTIVE", expiresAt },
+        include: { buyer: { select: { id: true, phone: true } } },
+      });
+
+      // Notify the buyer that their request was approved (in-app)
+      const carDesc = `${request.yearFrom}-${request.yearTo} ${request.make} ${request.model}`;
+      createNotification({
+        userId: updatedRequest.buyer.id,
+        type: "CAR_REQUEST_MATCH",
+        title: "Your car request has been approved!",
+        body: `Your request for a ${carDesc} is now live. Dealers are reviewing it and will reach out if they have a match.`,
+        data: { requestId: input.id },
+      }).catch(console.error);
+
+      // WhatsApp the buyer (fire-and-forget)
+      if (updatedRequest.buyer.phone) {
+        whatsappCarRequestApproved({
+          buyerPhone: updatedRequest.buyer.phone,
+          carDesc,
+        }).catch(console.error);
+      }
+
+      // Notify BRONZE+ dealers — wording emphasizes it's a market-wide request
+      notifyNewCarRequest({
+        make: request.make,
+        model: request.model,
+        yearFrom: request.yearFrom,
+        yearTo: request.yearTo,
+      }).catch(console.error);
+
+      // Log admin action
+      await ctx.prisma.adminLog.create({
+        data: {
+          adminId: ctx.session.user.id,
+          action: "APPROVE_CAR_REQUEST",
+          targetType: "CarRequest",
+          targetId: input.id,
+          details: { make: request.make, model: request.model },
+        },
+      });
+
+      return { success: true };
+    }),
+
+  /** Reject a car request. */
+  rejectCarRequest: adminProcedure
+    .input(z.object({ id: z.string().uuid(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const request = await ctx.prisma.carRequest.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!request || request.status !== "PENDING_REVIEW") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Request not found or already processed",
+        });
+      }
+
+      await ctx.prisma.carRequest.update({
+        where: { id: input.id },
+        data: { status: "CANCELLED" },
+      });
+
+      await ctx.prisma.adminLog.create({
+        data: {
+          adminId: ctx.session.user.id,
+          action: "REJECT_CAR_REQUEST",
+          targetType: "CarRequest",
+          targetId: input.id,
+          details: { reason: input.reason ?? null },
         },
       });
 

@@ -123,6 +123,19 @@ export async function whatsappNewInquiry({
   return { sent, deepLink };
 }
 
+export async function whatsappCarRequestApproved({
+  buyerPhone,
+  carDesc,
+}: {
+  buyerPhone: string;
+  carDesc: string;
+}): Promise<WhatsAppResult> {
+  const message = `[CarSouk] Your car request for a ${carDesc} has been approved! Dealers are now reviewing it and will contact you if they have a match.`;
+  const deepLink = generateWhatsAppDeepLink(buyerPhone, message);
+  const sent = await sendWhatsAppMessage(buyerPhone, message);
+  return { sent, deepLink };
+}
+
 export async function whatsappNewOffer({
   buyerPhone,
   dealerName,

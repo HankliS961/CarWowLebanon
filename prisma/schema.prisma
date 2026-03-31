@@ -181,6 +181,16 @@ enum NotificationType {
   LISTING_MATCH
   NEW_AUCTION
   LISTING_WARNING
+  NEW_CAR_REQUEST
+  CAR_REQUEST_MATCH
+}
+
+enum CarRequestStatus {
+  PENDING_REVIEW
+  ACTIVE
+  EXPIRED
+  FULFILLED
+  CANCELLED
 }
 
 enum SearchAlertFrequency {
@@ -282,6 +292,7 @@ model User {
   searchAlerts    SearchAlert[]
   notifications   Notification[]
   dealerReviews   DealerReview[]
+  carRequests     CarRequest[]
   blogPosts       BlogPost[]         @relation("BlogAuthor")
   carReviews      CarReview[]        @relation("CarReviewAuthor")
   adminLogs       AdminLog[]
@@ -827,4 +838,31 @@ model MarketPriceData {
   @@index([source])
   @@index([createdAt(sort: Desc)])
   @@map("market_price_data")
+}
+
+// ============================================================================
+// CAR REQUEST / WANTED CAR SYSTEM
+// ============================================================================
+
+model CarRequest {
+  id            String           @id @default(uuid())
+  buyerId       String
+  make          String
+  model         String
+  yearFrom      Int
+  yearTo        Int
+  transmission  Transmission?
+  bodyType      BodyType?
+  notes         String?          @db.Text
+  status        CarRequestStatus @default(PENDING_REVIEW)
+  expiresAt     DateTime
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  buyer User @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@index([make, model])
+  @@index([buyerId])
+  @@map("car_requests")
 }

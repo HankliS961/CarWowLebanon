@@ -82,8 +82,8 @@ export function DealerSidebar({ locale, open, onClose }: DealerSidebarProps) {
             href={`/${locale}/dealer`}
             className="flex items-center gap-2 text-lg font-bold text-primary"
           >
-            <Car className="h-6 w-6" />
-            <span>CarSouk</span>
+            <LayoutDashboard className="h-6 w-6" />
+            <span>Dealer Portal</span>
           </Link>
           <Button
             variant="ghost"

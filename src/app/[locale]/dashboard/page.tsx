@@ -7,16 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc/client";
 import {
-  Heart,
   MessageSquare,
   Settings2,
   Bell,
-  Search,
   DollarSign,
   Car,
-  ArrowRight,
-  Loader2,
   Check,
+  Megaphone,
 } from "lucide-react";
 import type { Locale } from "@/i18n/config";
 import { getNotificationHref } from "@/lib/notifications/href";
@@ -27,12 +24,12 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const userRole = (session?.user as any)?.role as string | undefined;
 
-  const { data: savedCars } = trpc.savedCars.list.useQuery();
   const { data: alerts } = trpc.searchAlerts.list.useQuery();
   const { data: sellListings } = trpc.sellListings.listMine.useQuery();
   const { data: inquiries } = trpc.inquiries.listMine.useQuery({ page: 1, limit: 50 });
   const { data: notifications } = trpc.notifications.list.useQuery({ limit: 5, offset: 0 });
   const { data: configurations } = trpc.configurations.listMine.useQuery();
+  const { data: carRequests } = trpc.carRequests.listMine.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -45,36 +42,36 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      icon: Heart,
-      label: t("quickStats.savedCars"),
-      count: savedCars?.length ?? 0,
-      href: "/dashboard/saved",
-      color: "text-red-500 bg-red-50",
-    },
-    {
       icon: MessageSquare,
-      label: t("quickStats.activeInquiries"),
+      label: locale === "ar" ? "الاستفسارات" : "Inquiries",
       count: inquiries?.filter((i) => i.status !== "CLOSED").length ?? 0,
       href: "/dashboard/inquiries",
       color: "text-blue-500 bg-blue-50",
     },
     {
       icon: DollarSign,
-      label: t("selling"),
+      label: locale === "ar" ? "البيع" : "Selling",
       count: sellListings?.filter((l) => l.status === "LIVE").length ?? 0,
       href: "/dashboard/selling",
       color: "text-emerald-500 bg-emerald-50",
     },
     {
       icon: Settings2,
-      label: t("quickStats.activeConfigs"),
+      label: locale === "ar" ? "عروضي" : "My Offers",
       count: configurations?.length ?? 0,
       href: "/get-offers/dashboard",
       color: "text-purple-500 bg-purple-50",
     },
     {
+      icon: Megaphone,
+      label: locale === "ar" ? "طلباتي" : "Requests",
+      count: carRequests?.filter((r) => r.status === "ACTIVE" || r.status === "PENDING_REVIEW").length ?? 0,
+      href: "/dashboard/requests",
+      color: "text-orange-500 bg-orange-50",
+    },
+    {
       icon: Bell,
-      label: t("quickStats.searchAlerts"),
+      label: locale === "ar" ? "التنبيهات" : "Alerts",
       count: alerts?.filter((a) => a.isActive).length ?? 0,
       href: "/dashboard/alerts",
       color: "text-amber-500 bg-amber-50",
@@ -87,7 +84,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold sm:text-3xl">{t("title")}</h1>
 
       {/* Quick Stats */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
         {stats.map((stat) => (
           <Link key={stat.href} href={stat.href}>
             <Card className="transition-shadow hover:shadow-md">
@@ -194,21 +191,10 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
         <Button asChild variant="outline" className="h-auto justify-start p-4">
-          <Link href="/cars">
-            <Search className="me-3 h-5 w-5 text-teal-500" />
-            <div className="text-start">
-              <p className="font-semibold">{t("quickActions.searchCars")}</p>
-              <p className="text-xs text-muted-foreground">
-                {locale === "ar" ? "تصفح جميع السيارات" : "Browse all listings"}
-              </p>
-            </div>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-auto justify-start p-4">
           <Link href="/get-offers">
             <Settings2 className="me-3 h-5 w-5 text-teal-500" />
             <div className="text-start">
-              <p className="font-semibold">{t("quickActions.getOffers")}</p>
+              <p className="font-semibold">{locale === "ar" ? "احصل على عروض" : "Get Offers"}</p>
               <p className="text-xs text-muted-foreground">
                 {locale === "ar" ? "دع الوكلاء يتنافسون" : "Let dealers compete"}
               </p>
@@ -219,9 +205,20 @@ export default function DashboardPage() {
           <Link href="/sell-my-car/valuation">
             <Car className="me-3 h-5 w-5 text-amber-500" />
             <div className="text-start">
-              <p className="font-semibold">{t("quickActions.sellYourCar")}</p>
+              <p className="font-semibold">{locale === "ar" ? "بيع سيارتك" : "Sell Your Car"}</p>
               <p className="text-xs text-muted-foreground">
                 {locale === "ar" ? "احصل على أفضل سعر" : "Get the best price"}
+              </p>
+            </div>
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="h-auto justify-start p-4">
+          <Link href="/dashboard/requests">
+            <Megaphone className="me-3 h-5 w-5 text-orange-500" />
+            <div className="text-start">
+              <p className="font-semibold">{locale === "ar" ? "طلب سيارة" : "Request a Car"}</p>
+              <p className="text-xs text-muted-foreground">
+                {locale === "ar" ? "لم تجد سيارتك؟ أخبرنا" : "Can't find your car? Tell us"}
               </p>
             </div>
           </Link>

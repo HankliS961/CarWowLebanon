@@ -91,6 +91,11 @@ export default function DealerSubscriptionPage() {
       getValue: (tier: SubscriptionTier) => TIER_LIMITS[tier].reverseMarketplace,
     },
     {
+      key: "buyerRequests",
+      label: "Buyer Car Requests",
+      getValue: (tier: SubscriptionTier) => TIER_LIMITS[tier].buyerRequests,
+    },
+    {
       key: "analytics",
       label: t("advancedAnalytics"),
       getValue: (tier: SubscriptionTier) => TIER_LIMITS[tier].analytics,
@@ -223,6 +228,16 @@ export default function DealerSubscriptionPage() {
                 <span className="text-muted-foreground">Team:</span>
                 <span className="font-medium">{currentLimits.teamMembers} members</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                {currentLimits.buyerRequests ? (
+                  <Check className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <X className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className={cn(!currentLimits.buyerRequests && "text-muted-foreground")}>
+                  Buyer Requests
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -316,6 +331,7 @@ export default function DealerSubscriptionPage() {
                     <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{limits.featuredListings} featured listings</p>
                     <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{limits.teamMembers} team members</p>
                     {limits.reverseMarketplace && <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />Reverse marketplace</p>}
+                    {limits.buyerRequests && <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />Access buyer car requests</p>}
                     {limits.analytics && <p className="flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />Advanced analytics</p>}
                   </CardContent>
                   <CardFooter>
